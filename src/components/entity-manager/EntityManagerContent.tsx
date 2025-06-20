@@ -1,30 +1,25 @@
 
 import React, { useState, useMemo } from 'react';
 import { useNotes } from '@/contexts/NotesContext';
-import { parseNoteConnections } from '@/utils/parsingUtils';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { EntityTypeGroup } from './EntityTypeGroup';
 
 export function EntityManagerContent() {
   const [searchQuery, setSearchQuery] = useState('');
-  const { selectedNote } = useNotes();
+  const { selectedNote, getConnectionsForNote } = useNotes();
 
-  // Parse entities from the current note
+  // Get connections for the current note
+  const connections = useMemo(() => {
+    if (!selectedNote) return null;
+    return getConnectionsForNote(selectedNote.id);
+  }, [selectedNote, getConnectionsForNote]);
+
+  // Get entities from connections
   const entities = useMemo(() => {
-    if (!selectedNote) return [];
-    
-    try {
-      const contentObj = typeof selectedNote.content === 'string' 
-        ? JSON.parse(selectedNote.content) 
-        : selectedNote.content;
-      const connections = parseNoteConnections(contentObj);
-      return connections.entities || [];
-    } catch (error) {
-      console.error('Failed to parse note content for entities:', error);
-      return [];
-    }
-  }, [selectedNote]);
+    if (!connections) return [];
+    return connections.entities || [];
+  }, [connections]);
 
   // Group entities by kind and filter by search
   const entityGroups = useMemo(() => {
@@ -55,6 +50,11 @@ export function EntityManagerContent() {
           <div className="text-xs text-muted-foreground">
             {selectedNote ? selectedNote.title : 'No note selected'}
           </div>
+          {connections && (
+            <div className="text-xs text-muted-foreground mt-1">
+              {entities.length} entities found
+            </div>
+          )}
         </div>
         
         {/* Search */}
