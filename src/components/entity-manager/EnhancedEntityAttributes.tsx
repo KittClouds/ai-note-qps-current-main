@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, X, Edit2, Check, XCircle } from 'lucide-react';
 import { TypedAttributeInput } from './TypedAttributeInput';
+import { AttributeType, AttributeValue } from '@/types/attributes';
 
 interface EnhancedEntityAttributesProps {
   attributes: Record<string, any>;
@@ -25,8 +26,8 @@ export function EnhancedEntityAttributes({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [newAttribute, setNewAttribute] = useState({
     name: '',
-    type: 'Text',
-    value: '',
+    type: 'Text' as AttributeType,
+    value: '' as any,
     unit: ''
   });
 
@@ -52,7 +53,7 @@ export function EnhancedEntityAttributes({
     return validated;
   }, [attributes]);
 
-  const getDefaultValueForType = (type: string): any => {
+  const getDefaultValueForType = (type: AttributeType): any => {
     switch (type) {
       case 'Text': return '';
       case 'Number': return 0;
@@ -60,6 +61,13 @@ export function EnhancedEntityAttributes({
       case 'Date': return new Date().toISOString();
       case 'List': return [];
       case 'URL': return '';
+      case 'ProgressBar': return { current: 100, maximum: 100 };
+      case 'StatBlock': return { 
+        strength: 10, dexterity: 10, constitution: 10, 
+        intelligence: 10, wisdom: 10, charisma: 10 
+      };
+      case 'EntityLink': return { id: '', label: '', kind: '' };
+      case 'Relationship': return { entityId: '', entityLabel: '', relationshipType: '' };
       default: return '';
     }
   };
@@ -95,19 +103,23 @@ export function EnhancedEntityAttributes({
     onAttributesChange(updatedAttributes);
   };
 
-  const getTypeColor = (type: string): string => {
-    const colors = {
+  const getTypeColor = (type: AttributeType): string => {
+    const colors: Record<AttributeType, string> = {
       Text: 'bg-blue-500/20 text-blue-400',
       Number: 'bg-green-500/20 text-green-400',
       Boolean: 'bg-purple-500/20 text-purple-400',
       Date: 'bg-orange-500/20 text-orange-400',
       List: 'bg-yellow-500/20 text-yellow-400',
-      URL: 'bg-cyan-500/20 text-cyan-400'
+      EntityLink: 'bg-pink-500/20 text-pink-400',
+      URL: 'bg-cyan-500/20 text-cyan-400',
+      ProgressBar: 'bg-emerald-500/20 text-emerald-400',
+      StatBlock: 'bg-indigo-500/20 text-indigo-400',
+      Relationship: 'bg-rose-500/20 text-rose-400'
     };
     return colors[type] || 'bg-gray-500/20 text-gray-400';
   };
 
-  const formatAttributeValue = (value: any, type: string = 'Text'): string => {
+  const formatAttributeValue = (value: any, type: AttributeType = 'Text'): string => {
     if (value === null || value === undefined) return '';
     
     switch (type) {
@@ -121,15 +133,27 @@ export function EnhancedEntityAttributes({
         }
       case 'List':
         return Array.isArray(value) ? value.join(', ') : String(value);
+      case 'ProgressBar':
+        return `${value?.current || 0}/${value?.maximum || 100}`;
+      case 'StatBlock':
+        return `STR:${value?.strength || 10}`;
+      case 'EntityLink':
+        return value?.label || 'No link';
+      case 'Relationship':
+        return `${value?.entityLabel || 'Unknown'} (${value?.relationshipType || 'related'})`;
       default:
         return String(value);
     }
   };
 
-  const detectAttributeType = (value: any): string => {
+  const detectAttributeType = (value: any): AttributeType => {
     if (typeof value === 'boolean') return 'Boolean';
     if (typeof value === 'number') return 'Number';
     if (Array.isArray(value)) return 'List';
+    if (typeof value === 'object' && value?.current !== undefined) return 'ProgressBar';
+    if (typeof value === 'object' && value?.strength !== undefined) return 'StatBlock';
+    if (typeof value === 'object' && value?.entityId !== undefined) return 'Relationship';
+    if (typeof value === 'object' && value?.id !== undefined) return 'EntityLink';
     if (typeof value === 'string') {
       // Check if it's a date
       if (value.match(/^\d{4}-\d{2}-\d{2}/) || !isNaN(Date.parse(value))) {
@@ -237,7 +261,7 @@ export function EnhancedEntityAttributes({
             />
             <Select
               value={newAttribute.type}
-              onValueChange={(type) => 
+              onValueChange={(type: AttributeType) => 
                 setNewAttribute({ ...newAttribute, type, value: getDefaultValueForType(type) })
               }
             >
@@ -250,7 +274,11 @@ export function EnhancedEntityAttributes({
                 <SelectItem value="Boolean">Boolean</SelectItem>
                 <SelectItem value="Date">Date</SelectItem>
                 <SelectItem value="List">List</SelectItem>
+                <SelectItem value="EntityLink">Entity Link</SelectItem>
                 <SelectItem value="URL">URL</SelectItem>
+                <SelectItem value="ProgressBar">Progress Bar</SelectItem>
+                <SelectItem value="StatBlock">Stat Block</SelectItem>
+                <SelectItem value="Relationship">Relationship</SelectItem>
               </SelectContent>
             </Select>
             <TypedAttributeInput
