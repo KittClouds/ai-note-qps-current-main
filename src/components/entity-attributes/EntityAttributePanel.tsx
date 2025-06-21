@@ -125,7 +125,6 @@ export function EntityAttributePanel({
         name: key,
         type: schemaAttr?.type || 'Text',
         value: value,
-        unit: schemaAttr?.unit,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -141,7 +140,6 @@ export function EntityAttributePanel({
             name: schemaAttr.name,
             type: schemaAttr.type,
             value: schemaAttr.defaultValue || '',
-            unit: schemaAttr.unit,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           });
