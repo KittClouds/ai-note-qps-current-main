@@ -27,7 +27,7 @@ export function SchemaEntityAttributes({
   const [newAttribute, setNewAttribute] = useState({
     name: '',
     type: 'Text' as AttributeType,
-    value: '' as AttributeValue,
+    value: '' as any,
     unit: ''
   });
 
@@ -63,7 +63,7 @@ export function SchemaEntityAttributes({
     return { schemaAttributes: schema, customAttributes: custom };
   }, [attributes, entitySchema]);
 
-  const getDefaultValueForType = (type: AttributeType): AttributeValue => {
+  const getDefaultValueForType = (type: AttributeType): any => {
     switch (type) {
       case 'ProgressBar': return { current: 100, maximum: 100 };
       case 'StatBlock': return { 
@@ -82,7 +82,7 @@ export function SchemaEntityAttributes({
     }
   };
 
-  const handleUpdateAttribute = (key: string, value: any, isSchema: boolean = false) => {
+  const handleUpdateAttribute = (key: string, value: any) => {
     const updatedAttributes = {
       ...schemaAttributes,
       ...customAttributes,
@@ -112,8 +112,8 @@ export function SchemaEntityAttributes({
     onAttributesChange(updatedAttributes);
   };
 
-  const getTypeColor = (type: string): string => {
-    const colors = {
+  const getTypeColor = (type: AttributeType): string => {
+    const colors: Record<AttributeType, string> = {
       Text: 'bg-blue-500/20 text-blue-400',
       Number: 'bg-green-500/20 text-green-400',
       Boolean: 'bg-purple-500/20 text-purple-400',
@@ -180,7 +180,7 @@ export function SchemaEntityAttributes({
               <TypedAttributeInput
                 type={type}
                 value={value}
-                onChange={(newValue) => handleUpdateAttribute(key, newValue, isSchema)}
+                onChange={(newValue) => handleUpdateAttribute(key, newValue)}
                 entityKind={entityKind}
                 entityLabel={entityLabel}
               />
