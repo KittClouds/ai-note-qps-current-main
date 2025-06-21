@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Database } from 'lucide-react';
 import {
   SidebarContent,
   SidebarHeader,
@@ -9,6 +9,9 @@ import {
   SidebarGroupLabel,
 } from "@/components/ui/sidebar";
 import { RightSidebar as RightSidebarWrapper } from './RightSidebarProvider';
+import { EntityAttributePanelContainer } from './entity-attributes/EntityAttributePanelContainer';
+import { ConnectionsPanelContainer } from './ConnectionsPanelContainer';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const RightSidebar = () => {
   return (
@@ -20,38 +23,23 @@ const RightSidebar = () => {
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="overflow-auto p-0">
-        <SidebarGroup>
-          <SidebarGroupLabel>Note Properties</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <div className="p-4 space-y-4">
-              <div className="bg-muted/50 h-6 rounded"></div>
-              <div className="bg-muted/50 h-6 rounded"></div>
-              <div className="bg-muted/50 h-6 rounded"></div>
-            </div>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        
-        <SidebarGroup>
-          <SidebarGroupLabel>Tags</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <div className="p-4 space-y-2">
-              <div className="bg-muted/50 h-4 rounded"></div>
-              <div className="bg-muted/50 h-4 rounded"></div>
-            </div>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        
-        <SidebarGroup>
-          <SidebarGroupLabel>Statistics</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <div className="p-4 space-y-2">
-              <div className="bg-muted/50 h-4 rounded"></div>
-              <div className="bg-muted/50 h-4 rounded"></div>
-              <div className="bg-muted/50 h-4 rounded"></div>
-            </div>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      <SidebarContent className="overflow-hidden p-0">
+        <Tabs defaultValue="entities" className="h-full flex flex-col">
+          <div className="px-4 pt-4">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="entities">Entities</TabsTrigger>
+              <TabsTrigger value="connections">Connections</TabsTrigger>
+            </TabsList>
+          </div>
+          
+          <TabsContent value="entities" className="flex-1 mt-0 overflow-hidden">
+            <EntityAttributePanelContainer />
+          </TabsContent>
+          
+          <TabsContent value="connections" className="flex-1 mt-0 overflow-hidden">
+            <ConnectionsPanelContainer isOpen={true} onToggle={() => {}} />
+          </TabsContent>
+        </Tabs>
       </SidebarContent>
     </RightSidebarWrapper>
   );
