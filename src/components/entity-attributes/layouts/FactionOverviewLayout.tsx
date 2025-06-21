@@ -1,18 +1,23 @@
 
 import React from 'react';
+import { TypedAttribute, RelationshipValue, ProgressBarValue } from '@/types/attributes';
+import { RelationshipRenderer } from '../renderers/RelationshipRenderer';
+import { ProgressBarRenderer } from '../renderers/ProgressBarRenderer';
 import { Badge } from '@/components/ui/badge';
 
 interface FactionOverviewLayoutProps {
-  attributes: any[];
-  onAttributeClick?: (attribute: any) => void;
+  attributes: TypedAttribute[];
+  onAttributeClick?: (attribute: TypedAttribute) => void;
 }
 
 export function FactionOverviewLayout({ attributes, onAttributeClick }: FactionOverviewLayoutProps) {
   // Group attributes for faction display
+  const relationships = attributes.filter(attr => attr.type === 'Relationship');
+  const progressBars = attributes.filter(attr => attr.type === 'ProgressBar');
   const textAttributes = attributes.filter(attr => ['Text', 'Number', 'Boolean'].includes(attr.type));
   const lists = attributes.filter(attr => attr.type === 'List');
 
-  const renderTextAttribute = (attr: any) => {
+  const renderTextAttribute = (attr: TypedAttribute) => {
     const formatValue = () => {
       switch (attr.type) {
         case 'Boolean':
@@ -32,7 +37,7 @@ export function FactionOverviewLayout({ attributes, onAttributeClick }: FactionO
     );
   };
 
-  const renderListAttribute = (attr: any) => {
+  const renderListAttribute = (attr: TypedAttribute) => {
     const list = attr.value as string[];
     return (
       <div key={attr.id} className="mb-3">
@@ -54,6 +59,44 @@ export function FactionOverviewLayout({ attributes, onAttributeClick }: FactionO
 
   return (
     <div className="space-y-4">
+      {/* Relationships Section */}
+      {relationships.length > 0 && (
+        <div className="bg-[#12141f] border border-[#1a1b23] rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <Badge className="bg-rose-500/20 text-rose-400 text-xs">Relationships</Badge>
+          </h3>
+          <div className="space-y-2">
+            {relationships.map(attr => (
+              <div key={attr.id}>
+                <div className="text-xs text-muted-foreground mb-1">{attr.name}</div>
+                <RelationshipRenderer 
+                  value={attr.value as RelationshipValue}
+                  onClick={() => onAttributeClick?.(attr)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Power & Influence Section */}
+      {progressBars.length > 0 && (
+        <div className="bg-[#12141f] border border-[#1a1b23] rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+            <Badge className="bg-emerald-500/20 text-emerald-400 text-xs">Power & Influence</Badge>
+          </h3>
+          <div className="space-y-4">
+            {progressBars.map(attr => (
+              <ProgressBarRenderer 
+                key={attr.id}
+                value={attr.value as ProgressBarValue} 
+                label={attr.name}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Basic Information Section */}
       {textAttributes.length > 0 && (
         <div className="bg-[#12141f] border border-[#1a1b23] rounded-lg p-4">

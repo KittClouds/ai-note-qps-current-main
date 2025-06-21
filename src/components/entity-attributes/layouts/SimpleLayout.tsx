@@ -1,14 +1,19 @@
 
 import React from 'react';
+import { TypedAttribute, ProgressBarValue, StatBlockValue, RelationshipValue, EntityReference } from '@/types/attributes';
 import { Badge } from '@/components/ui/badge';
+import { ProgressBarRenderer } from '../renderers/ProgressBarRenderer';
+import { StatBlockRenderer } from '../renderers/StatBlockRenderer';
+import { RelationshipRenderer } from '../renderers/RelationshipRenderer';
+import { EntityLinkRenderer } from '../renderers/EntityLinkRenderer';
 
 interface SimpleLayoutProps {
-  attributes: any[];
-  onAttributeClick?: (attribute: any) => void;
+  attributes: TypedAttribute[];
+  onAttributeClick?: (attribute: TypedAttribute) => void;
 }
 
 export function SimpleLayout({ attributes, onAttributeClick }: SimpleLayoutProps) {
-  const formatValue = (attribute: any): string => {
+  const formatValue = (attribute: TypedAttribute): string => {
     if (attribute.value === null || attribute.value === undefined) return 'N/A';
     
     switch (attribute.type) {
@@ -29,8 +34,39 @@ export function SimpleLayout({ attributes, onAttributeClick }: SimpleLayoutProps
     }
   };
 
-  const renderAttributeValue = (attribute: any) => {
+  const renderAttributeValue = (attribute: TypedAttribute) => {
     switch (attribute.type) {
+      case 'ProgressBar':
+        return (
+          <ProgressBarRenderer 
+            value={attribute.value as ProgressBarValue} 
+            label={attribute.name}
+          />
+        );
+      
+      case 'StatBlock':
+        return (
+          <StatBlockRenderer 
+            value={attribute.value as StatBlockValue}
+          />
+        );
+      
+      case 'Relationship':
+        return (
+          <RelationshipRenderer 
+            value={attribute.value as RelationshipValue}
+            onClick={() => onAttributeClick?.(attribute)}
+          />
+        );
+      
+      case 'EntityLink':
+        return (
+          <EntityLinkRenderer 
+            value={attribute.value as EntityReference}
+            onClick={() => onAttributeClick?.(attribute)}
+          />
+        );
+      
       case 'List':
         const list = attribute.value as string[];
         return (

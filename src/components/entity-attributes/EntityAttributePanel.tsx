@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,30 +12,12 @@ import { SimpleLayout } from './layouts/SimpleLayout';
 import { CharacterSheetLayout } from './layouts/CharacterSheetLayout';
 import { FactionOverviewLayout } from './layouts/FactionOverviewLayout';
 import { ParsedConnections } from '@/utils/parsingUtils';
+import { TypedAttribute, ENTITY_SCHEMAS } from '@/types/attributes';
 
 interface EntityAttributePanelProps {
   connections?: ParsedConnections | null;
   noteTitle?: string;
 }
-
-const ENTITY_SCHEMAS = [
-  {
-    kind: 'CHARACTER',
-    attributes: [
-      { name: 'level', type: 'Number', defaultValue: 1 },
-      { name: 'class', type: 'Text', defaultValue: '' },
-      { name: 'health', type: 'ProgressBar', defaultValue: { current: 100, maximum: 100 } }
-    ]
-  },
-  {
-    kind: 'FACTION',
-    attributes: [
-      { name: 'influence', type: 'Number', defaultValue: 0 },
-      { name: 'territory', type: 'List', defaultValue: [] },
-      { name: 'leader', type: 'Text', defaultValue: '' }
-    ]
-  }
-];
 
 export function EntityAttributePanel({
   connections,
@@ -91,7 +72,7 @@ export function EntityAttributePanel({
   }, [entities, selectedEntity]);
 
   // Convert entity attributes to typed attributes with improved parsing
-  const typedAttributes = useMemo(() => {
+  const typedAttributes = useMemo((): TypedAttribute[] => {
     if (!selectedEntity?.attributes) return [];
     console.log('Converting attributes for entity:', selectedEntity.label);
     console.log('Raw attributes:', selectedEntity.attributes);
@@ -113,7 +94,7 @@ export function EntityAttributePanel({
     }
 
     const entitySchema = ENTITY_SCHEMAS.find(schema => schema.kind === selectedEntity.kind);
-    const attributes: any[] = [];
+    const attributes: TypedAttribute[] = [];
     console.log('Found schema for kind:', selectedEntity.kind, entitySchema);
 
     // Convert parsed attributes to typed attributes
@@ -124,7 +105,8 @@ export function EntityAttributePanel({
         id: `entity-${key}-${Date.now()}`,
         name: key,
         type: schemaAttr?.type || 'Text',
-        value: value,
+        value: value as any,
+        unit: schemaAttr?.unit,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -140,6 +122,7 @@ export function EntityAttributePanel({
             name: schemaAttr.name,
             type: schemaAttr.type,
             value: schemaAttr.defaultValue || '',
+            unit: schemaAttr.unit,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           });
