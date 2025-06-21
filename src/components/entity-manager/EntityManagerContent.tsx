@@ -12,22 +12,31 @@ export function EntityManagerContent() {
 
   // Parse entities from the current note
   const entities = useMemo(() => {
-    if (!selectedNote) return [];
+    if (!selectedNote) {
+      console.log('EntityManagerContent: No selected note');
+      return [];
+    }
     
     try {
       const contentObj = typeof selectedNote.content === 'string' 
         ? JSON.parse(selectedNote.content) 
         : selectedNote.content;
+      
+      console.log('EntityManagerContent: Parsing content:', contentObj);
       const connections = parseNoteConnections(contentObj);
+      console.log('EntityManagerContent: Parsed entities:', connections.entities);
+      
       return connections.entities || [];
     } catch (error) {
-      console.error('Failed to parse note content for entities:', error);
+      console.error('EntityManagerContent: Failed to parse note content for entities:', error);
       return [];
     }
   }, [selectedNote]);
 
   // Group entities by kind and filter by search
   const entityGroups = useMemo(() => {
+    console.log('EntityManagerContent: Processing entities for grouping:', entities);
+    
     const filtered = searchQuery 
       ? entities.filter(entity => 
           entity.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -43,6 +52,7 @@ export function EntityManagerContent() {
       groups[entity.kind].push(entity);
     });
 
+    console.log('EntityManagerContent: Entity groups:', groups);
     return groups;
   }, [entities, searchQuery]);
 
@@ -55,6 +65,11 @@ export function EntityManagerContent() {
           <div className="text-xs text-muted-foreground">
             {selectedNote ? selectedNote.title : 'No note selected'}
           </div>
+          {selectedNote && (
+            <div className="text-xs text-muted-foreground mt-1">
+              Found {entities.length} entities
+            </div>
+          )}
         </div>
         
         {/* Search */}

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,16 +7,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Plus, X, Edit2, Check, XCircle } from 'lucide-react';
 import { TypedAttributeInput } from './TypedAttributeInput';
-
-interface TypedAttribute {
-  id: string;
-  name: string;
-  type: string;
-  value: any;
-  unit?: string;
-  createdAt: string;
-  updatedAt: string;
-}
 
 interface EnhancedEntityAttributesProps {
   attributes: Record<string, any>;
@@ -39,6 +30,28 @@ export function EnhancedEntityAttributes({
     unit: ''
   });
 
+  // Validate and normalize attributes
+  const validatedAttributes = React.useMemo(() => {
+    console.log('EnhancedEntityAttributes: Raw attributes:', attributes);
+    
+    // Handle case where attributes might be a string or invalid
+    if (!attributes || typeof attributes !== 'object' || Array.isArray(attributes)) {
+      console.log('EnhancedEntityAttributes: Invalid attributes, returning empty object');
+      return {};
+    }
+    
+    // Filter out any non-serializable values and ensure we have valid key-value pairs
+    const validated: Record<string, any> = {};
+    Object.entries(attributes).forEach(([key, value]) => {
+      if (typeof key === 'string' && key.length > 0) {
+        validated[key] = value;
+      }
+    });
+    
+    console.log('EnhancedEntityAttributes: Validated attributes:', validated);
+    return validated;
+  }, [attributes]);
+
   const getDefaultValueForType = (type: string): any => {
     switch (type) {
       case 'Text': return '';
@@ -55,10 +68,11 @@ export function EnhancedEntityAttributes({
     if (!newAttribute.name.trim()) return;
 
     const updatedAttributes = {
-      ...attributes,
+      ...validatedAttributes,
       [newAttribute.name.trim()]: newAttribute.value || getDefaultValueForType(newAttribute.type)
     };
 
+    console.log('EnhancedEntityAttributes: Adding attribute:', updatedAttributes);
     onAttributesChange(updatedAttributes);
     setNewAttribute({ name: '', type: 'Text', value: '', unit: '' });
     setIsAddingNew(false);
@@ -66,16 +80,18 @@ export function EnhancedEntityAttributes({
 
   const handleUpdateAttribute = (key: string, value: any) => {
     const updatedAttributes = {
-      ...attributes,
+      ...validatedAttributes,
       [key]: value
     };
+    console.log('EnhancedEntityAttributes: Updating attribute:', updatedAttributes);
     onAttributesChange(updatedAttributes);
     setEditingKey(null);
   };
 
   const handleDeleteAttribute = (key: string) => {
-    const updatedAttributes = { ...attributes };
+    const updatedAttributes = { ...validatedAttributes };
     delete updatedAttributes[key];
+    console.log('EnhancedEntityAttributes: Deleting attribute:', updatedAttributes);
     onAttributesChange(updatedAttributes);
   };
 
@@ -92,11 +108,17 @@ export function EnhancedEntityAttributes({
   };
 
   const formatAttributeValue = (value: any, type: string = 'Text'): string => {
+    if (value === null || value === undefined) return '';
+    
     switch (type) {
       case 'Boolean':
         return value ? 'true' : 'false';
       case 'Date':
-        return new Date(value).toLocaleDateString();
+        try {
+          return new Date(value).toLocaleDateString();
+        } catch {
+          return String(value);
+        }
       case 'List':
         return Array.isArray(value) ? value.join(', ') : String(value);
       default:
@@ -104,81 +126,102 @@ export function EnhancedEntityAttributes({
     }
   };
 
-  const renderAttributeCard = (key: string, value: any, type: string = 'Text') => (
-    <Card key={key} className="bg-background/50 border-border/50">
-      <CardContent className="p-2">
-        {editingKey === key ? (
-          <div className="space-y-2">
-            <TypedAttributeInput
-              type={type}
-              value={value}
-              onChange={(newValue) => handleUpdateAttribute(key, newValue)}
-              entityKind={entityKind}
-              entityLabel={entityLabel}
-            />
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                onClick={() => setEditingKey(null)}
-                className="h-5 px-2 text-xs"
-              >
-                <Check className="h-2 w-2" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditingKey(null)}
-                className="h-5 px-2 text-xs hover:bg-destructive/20 hover:text-destructive"
-              >
-                <XCircle className="h-2 w-2" />
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-1 mb-1">
-                <Badge className={`text-xs ${getTypeColor(type)}`}>
-                  {type}
-                </Badge>
-                <span className="text-xs font-medium">{key}</span>
+  const detectAttributeType = (value: any): string => {
+    if (typeof value === 'boolean') return 'Boolean';
+    if (typeof value === 'number') return 'Number';
+    if (Array.isArray(value)) return 'List';
+    if (typeof value === 'string') {
+      // Check if it's a date
+      if (value.match(/^\d{4}-\d{2}-\d{2}/) || !isNaN(Date.parse(value))) {
+        return 'Date';
+      }
+      // Check if it's a URL
+      if (value.startsWith('http://') || value.startsWith('https://')) {
+        return 'URL';
+      }
+    }
+    return 'Text';
+  };
+
+  const renderAttributeCard = (key: string, value: any) => {
+    const detectedType = detectAttributeType(value);
+    
+    return (
+      <Card key={key} className="bg-background/50 border-border/50">
+        <CardContent className="p-2">
+          {editingKey === key ? (
+            <div className="space-y-2">
+              <TypedAttributeInput
+                type={detectedType}
+                value={value}
+                onChange={(newValue) => handleUpdateAttribute(key, newValue)}
+                entityKind={entityKind}
+                entityLabel={entityLabel}
+              />
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  onClick={() => setEditingKey(null)}
+                  className="h-5 px-2 text-xs"
+                >
+                  <Check className="h-2 w-2" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditingKey(null)}
+                  className="h-5 px-2 text-xs hover:bg-destructive/20 hover:text-destructive"
+                >
+                  <XCircle className="h-2 w-2" />
+                </Button>
               </div>
-              <div className="text-xs text-muted-foreground">
-                {formatAttributeValue(value, type)}
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-1 mb-1">
+                  <Badge className={`text-xs ${getTypeColor(detectedType)}`}>
+                    {detectedType}
+                  </Badge>
+                  <span className="text-xs font-medium">{key}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {formatAttributeValue(value, detectedType)}
+                </div>
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setEditingKey(key)}
+                  className="h-5 w-5 p-0 hover:bg-primary/20 hover:text-primary"
+                >
+                  <Edit2 className="h-2 w-2" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => handleDeleteAttribute(key)}
+                  className="h-5 w-5 p-0 hover:bg-destructive/20 hover:text-destructive"
+                >
+                  <X className="h-2 w-2" />
+                </Button>
               </div>
             </div>
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setEditingKey(key)}
-                className="h-5 w-5 p-0 hover:bg-primary/20 hover:text-primary"
-              >
-                <Edit2 className="h-2 w-2" />
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleDeleteAttribute(key)}
-                className="h-5 w-5 p-0 hover:bg-destructive/20 hover:text-destructive"
-              >
-                <X className="h-2 w-2" />
-              </Button>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
+  const attributeKeys = Object.keys(validatedAttributes);
 
   return (
     <div className="space-y-2">
-      {Object.keys(attributes).length > 0 && (
+      {attributeKeys.length > 0 && (
         <div className="space-y-2">
-          {Object.entries(attributes).map(([key, value]) => 
-            renderAttributeCard(key, value, typeof value === 'boolean' ? 'Boolean' : 
-                                           typeof value === 'number' ? 'Number' :
-                                           Array.isArray(value) ? 'List' : 'Text')
+          {attributeKeys.map((key) => 
+            renderAttributeCard(key, validatedAttributes[key])
           )}
         </div>
       )}

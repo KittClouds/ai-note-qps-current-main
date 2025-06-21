@@ -20,18 +20,30 @@ export function EntityCard({ entity }: EntityCardProps) {
   const entityKey = `${entity.kind}:${entity.label}`;
 
   useEffect(() => {
+    console.log('EntityCard: Entity data:', entity);
+    console.log('EntityCard: Entity attributes:', entity.attributes);
+    
     if (isExpanded) {
       const savedAttributes = getEntityAttributes(entityKey);
-      // Merge with existing attributes from the entity
+      
+      // Properly merge attributes - ensure we're working with objects
+      let entityAttrs = {};
+      if (entity.attributes && typeof entity.attributes === 'object') {
+        entityAttrs = entity.attributes;
+      }
+      
       const mergedAttributes = {
-        ...entity.attributes,
+        ...entityAttrs,
         ...savedAttributes
       };
+      
+      console.log('EntityCard: Merged attributes:', mergedAttributes);
       setAttributes(mergedAttributes);
     }
   }, [entityKey, entity.attributes, isExpanded, getEntityAttributes]);
 
   const handleAttributesChange = (updatedAttributes: Record<string, any>) => {
+    console.log('EntityCard: Updating attributes:', updatedAttributes);
     setAttributes(updatedAttributes);
     setEntityAttributes(entityKey, updatedAttributes);
   };
@@ -49,6 +61,11 @@ export function EntityCard({ entity }: EntityCardProps) {
             <Badge variant="outline" className="text-xs capitalize">
               {entity.kind.toLowerCase()}
             </Badge>
+            {entity.attributes && Object.keys(entity.attributes).length > 0 && (
+              <Badge variant="secondary" className="text-xs">
+                {Object.keys(entity.attributes).length} attrs
+              </Badge>
+            )}
           </div>
           {isExpanded ? (
             <ChevronUp className="h-3 w-3" />
