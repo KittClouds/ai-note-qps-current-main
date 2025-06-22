@@ -20,6 +20,10 @@ export type { SimilarityResult, SimilarityOptions } from './similarityUtils';
 // Export chunking utilities
 export { createChunks, optimizeAndRebalanceChunks, applyPrefixToChunk } from './chunkingUtils';
 
+// Export semantic search service
+export { semanticSearchService, SemanticSearchService } from './SemanticSearchService';
+export type { SearchResult } from './SemanticSearchService';
+
 // Export configuration
 export { DEFAULT_CONFIG } from './config';
 export type { ConfigType } from './config';

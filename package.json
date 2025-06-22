@@ -52,6 +52,7 @@
     "framer-motion": "^12.18.1",
     "input-otp": "^1.2.4",
     "katex": "^0.16.22",
+    "lodash.debounce": "^4.0.8",
     "lru-cache": "^11.1.0",
     "lucide-react": "^0.462.0",
     "next-themes": "^0.3.0",
