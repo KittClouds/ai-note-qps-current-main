@@ -1,7 +1,8 @@
-
 import { GraphRAG, GraphNode, RankedNode } from './graphrag';
 import { HNSWAdapter } from './hnswAdapter';
 import { createNoteChunks, TextChunk, preprocessText } from './textProcessing';
+import { createNoteChunksSemantic } from './textProcessing';
+import { SemanticChunkingOptions } from './semanticChunkingConfig';
 
 export interface EmbeddingWorkerMessage {
   source: string;
@@ -114,16 +115,41 @@ export class EmbeddingsService {
   }
 
   /**
-   * Add a note to the knowledge graph
+   * Add a note to the knowledge graph with enhanced chunking options
    */
-  async addNote(noteId: string, title: string, content: string): Promise<void> {
+  async addNote(
+    noteId: string, 
+    title: string, 
+    content: string,
+    chunkingMethod: 'semantic' | 'basic' | 'sentences' | 'original' = 'original',
+    semanticOptions: SemanticChunkingOptions = {}
+  ): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();
     }
 
     try {
-      // Create chunks from the note
-      const chunks = createNoteChunks(noteId, title, content);
+      let chunks: TextChunk[];
+      
+      // Use semantic chunking if requested
+      if (chunkingMethod !== 'original') {
+        chunks = await createNoteChunksSemantic(
+          noteId, 
+          title, 
+          content, 
+          chunkingMethod,
+          {
+            maxTokenSize: 500,
+            similarityThreshold: 0.7,
+            combineChunks: true,
+            logging: false,
+            ...semanticOptions
+          }
+        );
+      } else {
+        // Use original chunking method
+        chunks = createNoteChunks(noteId, title, content);
+      }
       
       if (chunks.length === 0) {
         console.warn(`No chunks created for note ${noteId}`);
@@ -144,7 +170,8 @@ export class EmbeddingsService {
           metadata: {
             ...chunk.metadata,
             originalNoteId: noteId,
-            title: title
+            title: title,
+            chunkingMethod
           }
         };
         
@@ -164,7 +191,7 @@ export class EmbeddingsService {
         k: 10 
       });
 
-      console.log(`Added note ${noteId} with ${chunks.length} chunks to knowledge graph`);
+      console.log(`Added note ${noteId} with ${chunks.length} chunks using ${chunkingMethod} chunking to knowledge graph`);
     } catch (error) {
       console.error(`Failed to add note ${noteId} to embeddings:`, error);
       throw error;
@@ -251,14 +278,18 @@ export class EmbeddingsService {
   }
 
   /**
-   * Sync all notes to the embeddings index
+   * Sync all notes with enhanced chunking options
    */
-  async syncAllNotes(notes: Array<{ id: string; title: string; content: string }>): Promise<number> {
+  async syncAllNotes(
+    notes: Array<{ id: string; title: string; content: string }>,
+    chunkingMethod: 'semantic' | 'basic' | 'sentences' | 'original' = 'original',
+    semanticOptions: SemanticChunkingOptions = {}
+  ): Promise<number> {
     let syncedCount = 0;
     
     for (const note of notes) {
       try {
-        await this.addNote(note.id, note.title, note.content);
+        await this.addNote(note.id, note.title, note.content, chunkingMethod, semanticOptions);
         syncedCount++;
       } catch (error) {
         console.error(`Failed to sync note ${note.id}:`, error);

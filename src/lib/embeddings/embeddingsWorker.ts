@@ -20,21 +20,65 @@ class MyFeatureExtractionPipeline {
 // Define the query prefix required by the Snowflake model
 const QUERY_PREFIX = "Represent this sentence for searching relevant passages: ";
 
+// Request queue for handling multiple embedding requests
+const requestQueue = new Map();
+let isProcessing = false;
+
 // Listen for messages from the main thread
 self.addEventListener("message", async (event) => {
+  const { id, source, text, isQuery = false, batch = false } = event.data;
+
+  // Handle batch requests
+  if (batch && Array.isArray(text)) {
+    try {
+      const extractor = await MyFeatureExtractionPipeline.getInstance((x) => {
+        self.postMessage({ type: 'progress', data: x });
+      });
+
+      const processedTexts = text.map((t, index) => {
+        if (isQuery) {
+          return QUERY_PREFIX + t;
+        }
+        return t;
+      });
+
+      const embeddings = await extractor(processedTexts, {
+        pooling: "cls",
+        normalize: true,
+      });
+
+      // Send batch results back
+      self.postMessage({
+        type: 'batch_complete',
+        id,
+        embeddings: embeddings.tolist()
+      });
+    } catch (error) {
+      self.postMessage({
+        type: 'batch_error',
+        id,
+        error: error.message
+      });
+    }
+    return;
+  }
+
+  // Handle single requests with queue
+  if (id) {
+    requestQueue.set(id, { source, text, isQuery });
+    
+    if (!isProcessing) {
+      processQueue();
+    }
+    return;
+  }
+
+  // Legacy support for original format
   try {
-    // Retrieve the pipeline. When called for the first time,
-    // this will load the pipeline and save it for future use.
     const extractor = await MyFeatureExtractionPipeline.getInstance((x) => {
-      // We also add a progress callback to the pipeline so that we can
-      // track model loading.
       self.postMessage(x);
     });
 
-    const { source, text, isQuery = false } = event.data;
-
-    // Prepare the sentences for the model.
-    // The query gets a prefix, but the documents do not.
     let processedText;
     if (isQuery) {
       processedText = QUERY_PREFIX + source;
@@ -42,13 +86,11 @@ self.addEventListener("message", async (event) => {
       processedText = Array.isArray(text) ? text : [text];
     }
 
-    // Generate embeddings using the recommended pooling and normalization settings
     const embeddings = await extractor(processedText, {
       pooling: "cls",
       normalize: true,
     });
 
-    // Send the output back to the main thread
     self.postMessage({
       status: "complete",
       embeddings: embeddings.tolist()
@@ -60,3 +102,59 @@ self.addEventListener("message", async (event) => {
     });
   }
 });
+
+async function processQueue() {
+  if (isProcessing || requestQueue.size === 0) return;
+  
+  isProcessing = true;
+  
+  try {
+    const extractor = await MyFeatureExtractionPipeline.getInstance();
+    
+    // Process requests in batches for efficiency
+    const batchSize = 5;
+    const entries = Array.from(requestQueue.entries());
+    
+    for (let i = 0; i < entries.length; i += batchSize) {
+      const batch = entries.slice(i, i + batchSize);
+      const batchTexts = batch.map(([_, { source, text, isQuery }]) => {
+        const textToProcess = text || source;
+        return isQuery ? QUERY_PREFIX + textToProcess : textToProcess;
+      });
+      
+      const embeddings = await extractor(batchTexts, {
+        pooling: "cls",
+        normalize: true,
+      });
+      
+      const embeddingList = embeddings.tolist();
+      
+      // Send individual responses
+      batch.forEach(([id], index) => {
+        self.postMessage({
+          type: 'complete',
+          id,
+          embedding: embeddingList[index]
+        });
+        requestQueue.delete(id);
+      });
+    }
+  } catch (error) {
+    // Send error to all pending requests
+    for (const [id] of requestQueue) {
+      self.postMessage({
+        type: 'error',
+        id,
+        error: error.message
+      });
+    }
+    requestQueue.clear();
+  }
+  
+  isProcessing = false;
+  
+  // Process any new requests that came in
+  if (requestQueue.size > 0) {
+    setTimeout(processQueue, 10);
+  }
+}

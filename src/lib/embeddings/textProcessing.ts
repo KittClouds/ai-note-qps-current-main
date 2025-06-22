@@ -1,4 +1,3 @@
-
 export interface TextChunk {
   text: string;
   metadata: Record<string, any>;
@@ -152,4 +151,165 @@ export function createNoteChunks(
     title,
     type: 'note'
   });
+}
+
+import { semanticChunker } from './semanticChunking';
+import { SemanticChunkingOptions } from './semanticChunkingConfig';
+
+/**
+ * Create semantic chunks using similarity-based chunking
+ */
+export async function chunkitSemantic(
+  text: string,
+  options: SemanticChunkingOptions & { 
+    chunkSize?: number; 
+    metadata?: Record<string, any> 
+  } = {}
+): Promise<TextChunk[]> {
+  const { chunkSize = 500, metadata = {}, ...semanticOptions } = options;
+  
+  const documents = [{
+    document_text: text,
+    document_name: metadata.title || 'Document'
+  }];
+
+  const semanticChunks = await semanticChunker.chunkit(documents, {
+    ...semanticOptions,
+    maxTokenSize: chunkSize,
+    returnTokenLength: true
+  });
+
+  return semanticChunks.map((chunk, index) => ({
+    text: chunk.text,
+    metadata: {
+      ...metadata,
+      chunkIndex: index,
+      totalChunks: semanticChunks.length,
+      semanticScore: chunk.token_length || 0,
+      chunkNumber: chunk.chunk_number,
+      documentId: chunk.document_id
+    }
+  }));
+}
+
+/**
+ * Create basic chunks without semantic similarity (size-based only)
+ */
+export async function cramitBasic(
+  text: string,
+  options: SemanticChunkingOptions & { 
+    chunkSize?: number; 
+    metadata?: Record<string, any> 
+  } = {}
+): Promise<TextChunk[]> {
+  const { chunkSize = 500, metadata = {}, ...semanticOptions } = options;
+  
+  const documents = [{
+    document_text: text,
+    document_name: metadata.title || 'Document'
+  }];
+
+  const chunks = await semanticChunker.cramit(documents, {
+    ...semanticOptions,
+    maxTokenSize: chunkSize,
+    returnTokenLength: true
+  });
+
+  return chunks.map((chunk, index) => ({
+    text: chunk.text,
+    metadata: {
+      ...metadata,
+      chunkIndex: index,
+      totalChunks: chunks.length,
+      tokenLength: chunk.token_length || 0,
+      chunkNumber: chunk.chunk_number,
+      documentId: chunk.document_id
+    }
+  }));
+}
+
+/**
+ * Split text into individual sentences
+ */
+export async function sentenceitSplit(
+  text: string,
+  options: SemanticChunkingOptions & { metadata?: Record<string, any> } = {}
+): Promise<TextChunk[]> {
+  const { metadata = {}, ...semanticOptions } = options;
+  
+  const documents = [{
+    document_text: text,
+    document_name: metadata.title || 'Document'
+  }];
+
+  const sentences = await semanticChunker.sentenceit(documents, {
+    ...semanticOptions,
+    returnTokenLength: true
+  });
+
+  return sentences.map((sentence, index) => ({
+    text: sentence.text,
+    metadata: {
+      ...metadata,
+      sentenceIndex: index,
+      totalSentences: sentences.length,
+      tokenLength: sentence.token_length || 0,
+      sentenceNumber: sentence.chunk_number,
+      documentId: sentence.document_id
+    }
+  }));
+}
+
+/**
+ * Enhanced note chunking with semantic options
+ */
+export async function createNoteChunksSemantic(
+  noteId: string,
+  title: string,
+  content: string,
+  chunkingMethod: 'semantic' | 'basic' | 'sentences' = 'semantic',
+  options: SemanticChunkingOptions & { chunkSize?: number; overlap?: number } = {}
+): Promise<TextChunk[]> {
+  let textContent: string;
+  
+  try {
+    // Try to parse as TipTap JSON
+    const contentObj = typeof content === 'string' ? JSON.parse(content) : content;
+    textContent = extractTextFromTipTapDocument(contentObj);
+  } catch {
+    // Fallback to treating as plain text
+    textContent = typeof content === 'string' ? content : '';
+  }
+  
+  // Combine title and content
+  const fullText = `${title}\n\n${textContent}`;
+  const processedText = preprocessText(fullText);
+  
+  const baseMetadata = {
+    noteId,
+    title,
+    type: 'note'
+  };
+
+  // Choose chunking method
+  switch (chunkingMethod) {
+    case 'semantic':
+      return await chunkitSemantic(processedText, {
+        ...options,
+        metadata: baseMetadata
+      });
+    case 'basic':
+      return await cramitBasic(processedText, {
+        ...options,
+        metadata: baseMetadata
+      });
+    case 'sentences':
+      return await sentenceitSplit(processedText, {
+        ...options,
+        metadata: baseMetadata
+      });
+    default:
+      // Fallback to original chunking method
+      return chunkText(processedText, options.chunkSize || 500, options.overlap || 50, baseMetadata);
+  }
 }
