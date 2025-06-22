@@ -1,24 +1,15 @@
-
 import React, { useState } from 'react';
 import { Settings, Database } from 'lucide-react';
-import {
-  SidebarContent,
-  SidebarHeader,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-} from "@/components/ui/sidebar";
+import { SidebarContent, SidebarHeader, SidebarGroup, SidebarGroupContent, SidebarGroupLabel } from "@/components/ui/sidebar";
 import { RightSidebar as RightSidebarWrapper } from './RightSidebarProvider';
 import { EntityAttributePanelContainer } from './entity-attributes/EntityAttributePanelContainer';
 import { ConnectionsPanelContainer } from './ConnectionsPanelContainer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
 const RightSidebar = () => {
-  return (
-    <RightSidebarWrapper className="border-l border-border/50">
+  return <RightSidebarWrapper className="border-l border-border/50">
       <SidebarHeader className="p-4 border-b border-border/50">
         <div className="flex items-center gap-2">
-          <Settings className="h-5 w-5 text-primary" />
+          <Settings className="h-5 w-5 text-primary bg-inherit" />
           <h2 className="text-lg font-semibold text-foreground">Note Details</h2>
         </div>
       </SidebarHeader>
@@ -41,8 +32,6 @@ const RightSidebar = () => {
           </TabsContent>
         </Tabs>
       </SidebarContent>
-    </RightSidebarWrapper>
-  );
+    </RightSidebarWrapper>;
 };
-
 export default RightSidebar;
