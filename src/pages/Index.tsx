@@ -1,4 +1,3 @@
-
 import { AppSidebar } from "@/components/app-sidebar"
 import RightSidebar from "@/components/RightSidebar"
 import { RightSidebarProvider, RightSidebarTrigger } from "@/components/RightSidebarProvider"
@@ -24,6 +23,7 @@ import { useTheme } from "next-themes";
 import { useState, useCallback } from "react";
 import { NotesProvider, useNotes } from "@/contexts/NotesContext";
 import { EntityManagerDrawer } from "@/components/entity-manager/EntityManagerDrawer";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 function NotesApp() {
   const { theme } = useTheme();
@@ -88,6 +88,7 @@ function NotesApp() {
                 >
                   <Menu className="h-4 w-4" />
                 </Button>
+                <ThemeToggle />
                 <EntityManagerDrawer />
                 <RightSidebarTrigger />
               </div>
