@@ -56,10 +56,10 @@ function NotesApp() {
   return (
     <SidebarProvider>
       <RightSidebarProvider>
-        <div className="min-h-screen flex w-full">
+        <div className="min-h-screen flex w-full bg-background">
           <AppSidebar />
           <SidebarInset className="flex flex-col">
-            <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+            <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
               <SidebarTrigger className="-ml-1" />
               <Separator
                 orientation="vertical"
@@ -68,11 +68,11 @@ function NotesApp() {
               <Breadcrumb>
                 <BreadcrumbList>
                   <BreadcrumbItem className="hidden md:block">
-                    <BreadcrumbLink href="#">Notes</BreadcrumbLink>
+                    <BreadcrumbLink href="#" className="text-foreground hover:text-primary">Notes</BreadcrumbLink>
                   </BreadcrumbItem>
                   <BreadcrumbSeparator className="hidden md:block" />
                   <BreadcrumbItem>
-                    <BreadcrumbPage>
+                    <BreadcrumbPage className="text-foreground">
                       {selectedNote ? selectedNote.title : 'Select a note'}
                     </BreadcrumbPage>
                   </BreadcrumbItem>
@@ -82,7 +82,7 @@ function NotesApp() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8"
+                  className="h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors"
                   onClick={handleToggleToolbar}
                   title={toolbarVisible ? 'Hide toolbar (Ctrl+\\)' : 'Show toolbar (Ctrl+\\)'}
                 >
@@ -93,7 +93,7 @@ function NotesApp() {
               </div>
             </header>
             
-            <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex-1 flex flex-col min-h-0 bg-background">
               {selectedNote ? (
                 <>
                   <div className="flex-1 min-h-0">
@@ -112,8 +112,17 @@ function NotesApp() {
                   />
                 </>
               ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  Select a note to start editing
+                <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-background">
+                  <div className="text-center space-y-4">
+                    <div className="text-6xl mb-4">📝</div>
+                    <h2 className="text-2xl font-semibold text-foreground">No note selected</h2>
+                    <p className="text-muted-foreground max-w-md">
+                      Select a note from the sidebar or create a new one to start editing
+                    </p>
+                    <Button className="btn-purple-gradient text-white font-medium px-6 py-2 mt-4">
+                      Create New Note
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
