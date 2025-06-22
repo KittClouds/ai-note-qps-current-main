@@ -305,16 +305,16 @@ export class GraphRAG {
         throw new Error(`Query embedding must have dimension ${this.dimension}`);
       }
       // Find initial candidate set via dense search
-      initialScores = new Map(
-        Array.from(this.nodes.values())
-          .filter(n => n.embedding)
-          .map(node => [node.id, this.cosineSimilarity(queryEmbedding, node.embedding!)])
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, topK * 2)
-      );
+      const candidateScores: Array<[string, number]> = Array.from(this.nodes.values())
+        .filter(n => n.embedding)
+        .map(node => [node.id, this.cosineSimilarity(queryEmbedding, node.embedding!)] as [string, number])
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, topK * 2);
+      
+      initialScores = new Map(candidateScores);
     } else {
       // Use provided seed nodes with a uniform initial score
-      initialScores = new Map(seedNodeIds!.map(id => [id, 1.0]));
+      initialScores = new Map(seedNodeIds!.map(id => [id, 1.0] as [string, number]));
     }
 
     // Re-rank nodes using random walk

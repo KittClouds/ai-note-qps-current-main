@@ -1,8 +1,8 @@
 
-import { pipeline } from "@huggingface/transformers";
+import { pipeline, PipelineType } from "@huggingface/transformers";
 
 class MyFeatureExtractionPipeline {
-  static task = "feature-extraction";
+  static task: PipelineType = "feature-extraction";
   static model = "Snowflake/snowflake-arctic-embed-s";
   static instance = null;
 

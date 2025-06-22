@@ -128,7 +128,7 @@ export function preprocessText(text: string): string {
 export function createNoteChunks(
   noteId: string,
   title: string,
-  Content: string,
+  content: string,
   chunkSize: number = 500,
   overlap: number = 50
 ): TextChunk[] {
