@@ -34,6 +34,8 @@ export interface SentenceResult {
   token_length?: number;
 }
 
+type DtypeOption = 'fp32' | 'auto' | 'fp16' | 'q8' | 'int8' | 'uint8' | 'q4' | 'bnb4' | 'q4f16';
+
 export interface ChunkitOptions {
   logging?: boolean;
   maxTokenSize?: number;
@@ -44,7 +46,7 @@ export interface ChunkitOptions {
   combineChunks?: boolean;
   combineChunksSimilarityThreshold?: number;
   onnxEmbeddingModel?: string;
-  dtype?: string;
+  dtype?: DtypeOption;
   localModelPath?: string | null;
   modelCacheDir?: string | null;
   returnEmbedding?: boolean;

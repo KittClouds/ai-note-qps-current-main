@@ -19,10 +19,13 @@ export interface EmbeddingModelConfig {
   dtype: string;
 }
 
+// Define the allowed dtype values
+type DtypeOption = 'fp32' | 'auto' | 'fp16' | 'q8' | 'int8' | 'uint8' | 'q4' | 'bnb4' | 'q4f16';
+
 // Initialize embedding model and tokenizer
 export async function initializeEmbeddingUtils(
   onnxEmbeddingModel: string, 
-  dtype: string = 'fp32',
+  dtype: DtypeOption = 'fp32',
   localModelPath: string | null = null,
   modelCacheDir: string | null = null
 ): Promise<EmbeddingModelConfig> {
@@ -33,7 +36,7 @@ export async function initializeEmbeddingUtils(
 
   tokenizer = await AutoTokenizer.from_pretrained(onnxEmbeddingModel);
   generateEmbedding = await pipeline('feature-extraction', onnxEmbeddingModel, {
-    dtype: dtype,
+    dtype: dtype as any, // Cast to any to handle the pipeline type constraints
   });
 
   embeddingCache.clear();
