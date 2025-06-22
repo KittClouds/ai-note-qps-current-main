@@ -29,12 +29,22 @@ function ensureAbbreviations(abbrs: string[]): void {
   const fresh = abbrs.filter(a => !injectedAbbr.has(a));
   if (fresh.length === 0) return;
 
-  // Extend the global instance. Compromise merges into world.abbreviations.
-  nlp.extend((_Doc, world) => {
-    fresh.forEach(a => {
-      world.model.one.abbreviations.push(a);
-    });
-  });
+  // Create a proper plugin object for Compromise
+  const abbreviationPlugin = {
+    words: {},
+    tags: {},
+    // Plugin initialization function
+    init: (Doc: any, world: any) => {
+      fresh.forEach(a => {
+        if (world.model && world.model.one && world.model.one.abbreviations) {
+          world.model.one.abbreviations.push(a);
+        }
+      });
+    }
+  };
+
+  // Extend the global instance with proper plugin structure
+  nlp.extend(abbreviationPlugin);
   fresh.forEach(a => injectedAbbr.add(a));
 }
 
