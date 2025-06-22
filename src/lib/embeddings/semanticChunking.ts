@@ -1,5 +1,5 @@
 
-import { parseSentences } from 'sentence-parse';
+import { parseSentences } from './sentenceParser';
 import { cosineSimilarity } from './HNSW/similarity';
 import { SEMANTIC_CHUNKING_CONFIG, SemanticChunkingOptions, SemanticChunk } from './semanticChunkingConfig';
 

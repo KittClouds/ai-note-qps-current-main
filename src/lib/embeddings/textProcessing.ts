@@ -155,6 +155,7 @@ export function createNoteChunks(
 
 import { semanticChunker } from './semanticChunking';
 import { SemanticChunkingOptions } from './semanticChunkingConfig';
+import { parseSentences } from './sentenceParser';
 
 /**
  * Create semantic chunks using similarity-based chunking
