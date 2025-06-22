@@ -23,8 +23,3 @@ export { createChunks, optimizeAndRebalanceChunks, applyPrefixToChunk } from './
 // Export configuration
 export { DEFAULT_CONFIG } from './config';
 export type { ConfigType } from './config';
-
-// Export search services
-export { graphRAGSearchService } from './GraphRAGSearchService';
-export { semanticSearchService } from './SemanticSearchService';
-export type { SearchResult, IndexStatus } from './GraphRAGSearchService';
