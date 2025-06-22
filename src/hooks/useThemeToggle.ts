@@ -3,15 +3,6 @@ import { useTheme } from "next-themes";
 import { useCallback } from "react";
 import { flushSync } from "react-dom";
 
-declare global {
-  interface Document {
-    startViewTransition?: (callback: () => void) => {
-      ready: Promise<void>;
-      finished: Promise<void>;
-    };
-  }
-}
-
 export const useThemeToggle = () => {
   const { theme, setTheme } = useTheme();
 
@@ -30,11 +21,13 @@ export const useThemeToggle = () => {
     }
 
     // Start view transition
-    await document.startViewTransition(() => {
+    const transition = document.startViewTransition(() => {
       flushSync(() => {
         setTheme(newTheme);
       });
-    }).ready;
+    });
+
+    await transition.ready;
 
     // Calculate animation parameters
     const { top, left, width, height } = toggleRef.current.getBoundingClientRect();
