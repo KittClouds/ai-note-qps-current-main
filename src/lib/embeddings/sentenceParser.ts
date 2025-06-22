@@ -8,7 +8,7 @@
  * – Exposes the same async API your chunker expects.
  */
 
-import nlp from 'compromise/es';
+import nlp from 'compromise';
 
 export interface SentenceParseOptions {
   /**
