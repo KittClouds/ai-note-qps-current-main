@@ -13,29 +13,12 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FileTreeItem } from "./FileTreeItem"
-import { EnhancedSearchBar } from "./EnhancedSearchBar"
 import { useNotes } from "@/contexts/NotesContext"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { createNote, createFolder, getItemsByParent, state, selectItem } = useNotes();
+  const { createNote, createFolder, getItemsByParent } = useNotes();
   const rootItems = getItemsByParent(); // Items without a parent
-  const [searchQuery, setSearchQuery] = React.useState("");
-
-  // Filter notes for text search
-  const filteredItems = React.useMemo(() => {
-    if (!searchQuery.trim()) return rootItems;
-    
-    return state.items.filter(item => 
-      item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.type === 'note' && item.content.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
-  }, [rootItems, state.items, searchQuery]);
-
-  const handleNoteSelect = (noteId: string) => {
-    selectItem(noteId);
-  };
 
   return (
     <Sidebar {...props}>
@@ -64,63 +47,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </div>
         </div>
       </SidebarHeader>
-      
       <SidebarContent>
-        <div className="p-2">
-          <Tabs defaultValue="folders" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4">
-              <TabsTrigger value="folders" className="text-xs">Folders</TabsTrigger>
-              <TabsTrigger value="nests" className="text-xs">Nests</TabsTrigger>
-              <TabsTrigger value="search" className="text-xs">Search</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="folders" className="mt-0">
-              <SidebarGroup>
-                <SidebarGroupLabel>All Notes</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {rootItems.map((item) => (
-                      <FileTreeItem key={item.id} item={item} />
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            </TabsContent>
-            
-            <TabsContent value="nests" className="mt-0">
-              <SidebarGroup>
-                <SidebarGroupLabel>Nested Views</SidebarGroupLabel>
-                <SidebarGroupContent>
-                  <div className="text-sm text-muted-foreground p-4 text-center">
-                    Coming soon...
-                  </div>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            </TabsContent>
-            
-            <TabsContent value="search" className="mt-0">
-              <EnhancedSearchBar
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                notes={state.items.filter(item => item.type === 'note')}
-                onNoteSelect={handleNoteSelect}
-              />
-              
-              {searchQuery.trim() && (
-                <SidebarGroup>
-                  <SidebarGroupLabel>Search Results</SidebarGroupLabel>
-                  <SidebarGroupContent>
-                    <SidebarMenu>
-                      {filteredItems.map((item) => (
-                        <FileTreeItem key={item.id} item={item} />
-                      ))}
-                    </SidebarMenu>
-                  </SidebarGroupContent>
-                </SidebarGroup>
-              )}
-            </TabsContent>
-          </Tabs>
-        </div>
+        <SidebarGroup>
+          <SidebarGroupLabel>All Notes</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {rootItems.map((item) => (
+                <FileTreeItem key={item.id} item={item} />
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
       <SidebarRail />
     </Sidebar>
