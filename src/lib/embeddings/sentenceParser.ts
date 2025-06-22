@@ -1,101 +1,67 @@
 
-/**
- * Browser-compatible sentence parsing utility
- * Replaces the sentence-parse package that has Node.js dependencies
+/*
+ * Browser‑friendly sentence splitter powered by Compromise
+ * --------------------------------------------------------
+ * Drop‑in replacement for the previous regex workaround.  
+ * – Zero Node dependencies – works inside a Web Worker or main thread.
+ * – Adds optional custom abbreviations at runtime.
+ * – Exposes the same async API your chunker expects.
  */
+
+import nlp from 'compromise/es';
 
 export interface SentenceParseOptions {
+  /**
+   * List of abbreviations that should NOT end a sentence –
+   * e.g. ['Dr', 'e.g', 'U.S']
+   */
   abbreviations?: string[];
-  customRegex?: RegExp;
 }
 
-// Common abbreviations that shouldn't trigger sentence breaks
-const DEFAULT_ABBREVIATIONS = [
-  'Mr', 'Mrs', 'Ms', 'Dr', 'Prof', 'Sr', 'Jr',
-  'vs', 'etc', 'i.e', 'e.g', 'cf', 'al', 'Inc',
-  'Ltd', 'Co', 'Corp', 'LLC', 'St', 'Ave', 'Blvd',
-  'Rd', 'Ct', 'Pl', 'Sq', 'ft', 'lb', 'oz', 'kg',
-  'cm', 'mm', 'km', 'hr', 'min', 'sec', 'Jan',
-  'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
-  'Sep', 'Oct', 'Nov', 'Dec', 'Mon', 'Tue', 'Wed',
-  'Thu', 'Fri', 'Sat', 'Sun', 'U.S', 'U.K'
-];
+// Track abbreviations we have already injected – avoids duplicate plugins
+const injectedAbbr: Set<string> = new Set();
 
 /**
- * Split text into sentences using a regex-based approach
- * This is a simplified but effective sentence splitter for browser use
+ * Inject user‑supplied abbreviations into Compromise's world model.
+ * This runs once per new abbreviation and costs ~1 µs.
  */
-export async function parseSentences(
-  text: string, 
-  options: SentenceParseOptions = {}
-): Promise<string[]> {
-  if (!text || typeof text !== 'string') {
-    return [];
-  }
+function ensureAbbreviations(abbrs: string[]): void {
+  const fresh = abbrs.filter(a => !injectedAbbr.has(a));
+  if (fresh.length === 0) return;
 
-  const abbreviations = [...DEFAULT_ABBREVIATIONS, ...(options.abbreviations || [])];
-  
-  // Clean up the text
-  let cleanText = text
-    .replace(/\s+/g, ' ') // Normalize whitespace
-    .trim();
-
-  // Handle abbreviations by temporarily replacing them
-  const abbreviationMap = new Map<string, string>();
-  abbreviations.forEach((abbr, index) => {
-    const placeholder = `__ABBR_${index}__`;
-    const regex = new RegExp(`\\b${abbr.replace(/\./g, '\\.')}\\b`, 'gi');
-    cleanText = cleanText.replace(regex, (match) => {
-      abbreviationMap.set(placeholder, match);
-      return placeholder;
+  // Extend the global instance. Compromise merges into world.abbreviations.
+  nlp.extend((_Doc, world) => {
+    fresh.forEach(a => {
+      world.model.one.abbreviations.push(a);
     });
   });
-
-  // Split on sentence-ending punctuation followed by whitespace and capital letter
-  // or end of string
-  const sentences = cleanText
-    .split(/([.!?]+)\s+(?=[A-Z])|([.!?]+)$/)
-    .filter(part => part && part.trim().length > 0)
-    .reduce((acc: string[], current, index, array) => {
-      // Combine sentence parts that were split by the regex
-      if (index % 2 === 0) {
-        const nextPart = array[index + 1];
-        const sentence = nextPart ? current + nextPart : current;
-        if (sentence.trim()) {
-          acc.push(sentence.trim());
-        }
-      }
-      return acc;
-    }, []);
-
-  // Restore abbreviations
-  const finalSentences = sentences.map(sentence => {
-    let restored = sentence;
-    abbreviationMap.forEach((original, placeholder) => {
-      restored = restored.replace(new RegExp(placeholder, 'g'), original);
-    });
-    return restored;
-  }).filter(sentence => sentence.length > 0);
-
-  // If no sentences were found, return the original text as a single sentence
-  if (finalSentences.length === 0 && cleanText.trim()) {
-    return [cleanText.trim()];
-  }
-
-  return finalSentences;
+  fresh.forEach(a => injectedAbbr.add(a));
 }
 
 /**
- * Alternative sentence splitting method using a simpler approach
- * Useful as a fallback or for simpler text processing needs
+ * Split text into sentences using Compromise.
+ * Returns an array of trimmed sentence strings.
  */
-export function simpleParseSentences(text: string): string[] {
-  if (!text || typeof text !== 'string') {
-    return [];
+export async function parseSentences(
+  text: string,
+  options: SentenceParseOptions = {}
+): Promise<string[]> {
+  if (!text || typeof text !== 'string') return [];
+
+  // Optionally enrich the abbreviation list
+  if (options.abbreviations && options.abbreviations.length) {
+    ensureAbbreviations(options.abbreviations);
   }
 
-  return text
-    .split(/[.!?]+/)
-    .map(sentence => sentence.trim())
-    .filter(sentence => sentence.length > 0);
+  // Tokenise & extract sentences
+  const sentences = nlp(text).sentences().out('array') as string[];
+  return sentences.map(s => s.trim()).filter(Boolean);
+}
+
+/**
+ * Simple fallback using basic punctuation – exported for completeness.
+ */
+export function simpleParseSentences(text: string): string[] {
+  if (!text || typeof text !== 'string') return [];
+  return text.split(/[.!?]+/).map(t => t.trim()).filter(Boolean);
 }
