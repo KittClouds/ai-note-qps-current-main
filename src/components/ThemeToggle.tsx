@@ -1,17 +1,24 @@
 
 import { Moon, Sun } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useTheme } from "next-themes"
+import { useThemeToggle } from "@/hooks/useThemeToggle"
+import { useRef } from "react"
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme()
+  const { theme, toggleDarkMode } = useThemeToggle()
+  const toggleRef = useRef<HTMLButtonElement>(null)
+
+  const handleToggle = () => {
+    toggleDarkMode(toggleRef)
+  }
 
   return (
     <Button
+      ref={toggleRef}
       variant="ghost"
       size="icon"
       className="h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors"
-      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      onClick={handleToggle}
       title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
     >
       <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
