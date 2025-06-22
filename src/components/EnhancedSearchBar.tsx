@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { semanticSearchService, SearchResult } from '@/lib/embeddings/SemanticSearchService';
-import { Note } from '@/types/notes';
+import type { Note } from '@/types/notes';
 import { toast } from '@/hooks/use-toast';
 
 interface EnhancedSearchBarProps {

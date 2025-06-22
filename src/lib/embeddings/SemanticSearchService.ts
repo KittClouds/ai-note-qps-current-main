@@ -1,7 +1,8 @@
 
+import { HNSW } from './HNSW';
 import { createEmbedding, initializeEmbeddingUtils } from './embeddingUtils';
-import { HNSW, cosineSimilarity as hnswCosineSimilarity } from './HNSW';
-import { Note } from '@/types/notes';
+import { DEFAULT_CONFIG } from './config';
+import type { Note } from '@/types/notes';
 
 export interface SearchResult {
   noteId: string;
@@ -14,156 +15,128 @@ class SemanticSearchService {
   private hnsw: HNSW | null = null;
   private noteMap: Map<number, Note> = new Map();
   private initialized = false;
-  private embeddingCount = 0;
+  private currentNodeId = 0;
 
   async initialize() {
     if (this.initialized) return;
-    
+
     try {
-      await initializeEmbeddingUtils('Xenova/all-MiniLM-L6-v2', 'q8');
-      this.hnsw = new HNSW(384, 16, 200); // MiniLM-L6-v2 has 384 dimensions
+      // Initialize embedding utilities
+      await initializeEmbeddingUtils(
+        DEFAULT_CONFIG.ONNX_EMBEDDING_MODEL,
+        DEFAULT_CONFIG.DTYPE
+      );
+
+      // Initialize HNSW index - using default parameters
+      this.hnsw = new HNSW();
       this.initialized = true;
-      console.log('SemanticSearchService initialized');
     } catch (error) {
-      console.error('Failed to initialize SemanticSearchService:', error);
+      console.error('Failed to initialize semantic search:', error);
       throw error;
     }
   }
 
   async syncNote(note: Note): Promise<void> {
-    if (!this.initialized) {
-      await this.initialize();
+    await this.initialize();
+    
+    if (!this.hnsw) {
+      throw new Error('HNSW index not initialized');
     }
 
     try {
-      // Extract text content from the note
-      let textContent = '';
-      if (typeof note.content === 'string') {
-        try {
-          const contentObj = JSON.parse(note.content);
-          textContent = this.extractTextFromContent(contentObj);
-        } catch {
-          textContent = note.content;
+      // Create embedding for the note content
+      const text = `${note.title} ${note.content}`;
+      const embedding = await createEmbedding(text);
+      
+      // Find existing node for this note
+      let existingNodeId: number | null = null;
+      for (const [nodeId, storedNote] of this.noteMap) {
+        if (storedNote.id === note.id) {
+          existingNodeId = nodeId;
+          break;
         }
       }
 
-      if (!textContent.trim()) return;
-
-      // Create embedding
-      const embedding = await createEmbedding(textContent);
-      
-      // Add to HNSW index
-      const nodeId = this.hnsw!.addPoint(Array.from(embedding));
-      
-      // Store note mapping
-      this.noteMap.set(nodeId, note);
-      this.embeddingCount++;
-      
-      console.log(`Indexed note "${note.title}" with ID ${nodeId}`);
+      if (existingNodeId !== null) {
+        // Update existing node
+        this.hnsw.updateNode(existingNodeId, embedding);
+        this.noteMap.set(existingNodeId, note);
+      } else {
+        // Add new node
+        const nodeId = this.currentNodeId++;
+        this.hnsw.addNode(nodeId, embedding);
+        this.noteMap.set(nodeId, note);
+      }
     } catch (error) {
-      console.error(`Failed to sync note "${note.title}":`, error);
+      console.error('Failed to sync note:', error);
+      throw error;
     }
   }
 
   async syncAllNotes(notes: Note[]): Promise<number> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-
-    // Clear existing index
-    this.hnsw = new HNSW(384, 16, 200);
+    await this.initialize();
+    
+    // Clear existing data
+    this.hnsw = new HNSW();
     this.noteMap.clear();
-    this.embeddingCount = 0;
+    this.currentNodeId = 0;
 
+    let syncedCount = 0;
     for (const note of notes) {
-      await this.syncNote(note);
+      try {
+        await this.syncNote(note);
+        syncedCount++;
+      } catch (error) {
+        console.error(`Failed to sync note ${note.id}:`, error);
+      }
     }
 
-    return this.embeddingCount;
+    return syncedCount;
   }
 
   async search(query: string, limit: number = 10): Promise<SearchResult[]> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
-
-    if (!query.trim() || !this.hnsw || this.embeddingCount === 0) {
-      return [];
+    await this.initialize();
+    
+    if (!this.hnsw) {
+      throw new Error('HNSW index not initialized');
     }
 
     try {
-      // Create query embedding
+      // Create embedding for the query
       const queryEmbedding = await createEmbedding(query);
       
-      // Search HNSW index
-      const searchResults = this.hnsw.search(Array.from(queryEmbedding), limit);
+      // Search using HNSW
+      const results = this.hnsw.searchKNN(queryEmbedding, limit);
       
-      // Convert to SearchResult format
-      const results: SearchResult[] = [];
-      
-      for (const result of searchResults) {
-        const note = this.noteMap.get(result.node.id);
-        if (note) {
-          let textContent = '';
-          if (typeof note.content === 'string') {
-            try {
-              const contentObj = JSON.parse(note.content);
-              textContent = this.extractTextFromContent(contentObj);
-            } catch {
-              textContent = note.content;
-            }
-          }
-
-          results.push({
-            noteId: note.id,
-            title: note.title,
-            content: textContent,
-            score: result.distance // HNSW returns similarity as distance
-          });
+      // Convert results to SearchResult format
+      return results.map(result => {
+        const note = this.noteMap.get(result.node);
+        if (!note) {
+          console.warn(`Note not found for node ${result.node}`);
+          return null;
         }
-      }
-
-      return results.sort((a, b) => b.score - a.score);
+        
+        return {
+          noteId: note.id,
+          title: note.title,
+          content: note.content,
+          score: result.distance // HNSW returns distance, closer to 0 is better
+        };
+      }).filter(Boolean) as SearchResult[];
     } catch (error) {
       console.error('Search failed:', error);
-      return [];
+      throw error;
     }
   }
 
   getEmbeddingCount(): number {
-    return this.embeddingCount;
+    return this.noteMap.size;
   }
 
-  private extractTextFromContent(contentObj: any): string {
-    if (!contentObj || typeof contentObj !== 'object') return '';
-    
-    let text = '';
-    
-    if (contentObj.content && Array.isArray(contentObj.content)) {
-      for (const node of contentObj.content) {
-        text += this.extractTextFromNode(node) + ' ';
-      }
-    }
-    
-    return text.trim();
-  }
-
-  private extractTextFromNode(node: any): string {
-    if (!node || typeof node !== 'object') return '';
-    
-    let text = '';
-    
-    if (node.text) {
-      text += node.text;
-    }
-    
-    if (node.content && Array.isArray(node.content)) {
-      for (const childNode of node.content) {
-        text += this.extractTextFromNode(childNode) + ' ';
-      }
-    }
-    
-    return text;
+  clear(): void {
+    this.hnsw = new HNSW();
+    this.noteMap.clear();
+    this.currentNodeId = 0;
   }
 }
 
