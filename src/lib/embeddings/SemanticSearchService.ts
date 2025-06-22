@@ -58,13 +58,14 @@ class SemanticSearchService {
       }
 
       if (existingNodeId !== null) {
-        // Update existing node
-        this.hnsw.updateNode(existingNodeId, embedding);
+        // For updates, delete the old point and add a new one
+        this.hnsw.deletePoint(existingNodeId);
+        this.hnsw.addPoint(existingNodeId, embedding);
         this.noteMap.set(existingNodeId, note);
       } else {
-        // Add new node
+        // Add new point
         const nodeId = this.currentNodeId++;
-        this.hnsw.addNode(nodeId, embedding);
+        this.hnsw.addPoint(nodeId, embedding);
         this.noteMap.set(nodeId, note);
       }
     } catch (error) {
@@ -110,9 +111,9 @@ class SemanticSearchService {
       
       // Convert results to SearchResult format
       return results.map(result => {
-        const note = this.noteMap.get(result.node);
+        const note = this.noteMap.get(result.id);
         if (!note) {
-          console.warn(`Note not found for node ${result.node}`);
+          console.warn(`Note not found for node ${result.id}`);
           return null;
         }
         
@@ -120,7 +121,7 @@ class SemanticSearchService {
           noteId: note.id,
           title: note.title,
           content: note.content,
-          score: result.distance // HNSW returns distance, closer to 0 is better
+          score: result.score // HNSW returns score (similarity, higher is better)
         };
       }).filter(Boolean) as SearchResult[];
     } catch (error) {
