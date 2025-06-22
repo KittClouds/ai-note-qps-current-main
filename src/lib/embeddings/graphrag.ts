@@ -1,3 +1,6 @@
+
+// --- Core Graph Types ---
+
 export interface EdgeTypeDefinition {
   /** If true, creating an edge from A to B automatically creates an edge from B to A. */
   symmetrical?: boolean;
@@ -18,7 +21,7 @@ export interface GraphEdge {
   source: string;
   target: string;
   weight: number;
-  type: string; // Changed from 'semantic' to a general string
+  type: string;
 }
 
 export interface GraphChunk {
@@ -39,14 +42,13 @@ export interface SimilarityIndex {
   search(queryEmbedding: number[], k: number): Array<{ id: string; distance: number }>;
 }
 
-
 export class GraphRAG {
   private nodes: Map<string, GraphNode>;
   private edges: GraphEdge[];
   private dimension: number;
   private edgeTypeDefinitions: Map<string, EdgeTypeDefinition>;
 
-  constructor(dimension: number = 1536) {
+  constructor(dimension: number = 384) { // Changed from 1536 to 384
     this.nodes = new Map();
     this.edges = [];
     this.dimension = dimension;
@@ -169,7 +171,6 @@ export class GraphRAG {
     for (let i = 0; i < sortedNodes.length - 1; i++) {
       const sourceNode = sortedNodes[i]!;
       const targetNode = sortedNodes[i + 1]!;
-      // Weight could be 1 or based on time delta: 1 / (t2 - t1)
       this.addEdge({ source: sourceNode.id, target: targetNode.id, weight: 1.0, type: 'sequential' });
     }
   }
@@ -199,19 +200,18 @@ export class GraphRAG {
    */
   getNeighbors(nodeId: string, options: { edgeType?: string; direction?: 'in' | 'out' | 'both' } = {}): Array<{ id: string; weight: number }> {
     const { edgeType, direction = 'out' } = options;
-    // Use a Map to ensure uniqueness by neighbor ID, taking the first encountered weight or a specific strategy if needed.
     const neighbors = new Map<string, { id: string; weight: number }>();
 
     for(const edge of this.edges) {
         if (edgeType && edge.type !== edgeType) continue;
 
         if (direction === 'out' || direction === 'both') {
-            if (edge.source === nodeId && !neighbors.has(edge.target)) { // Add if not already present
+            if (edge.source === nodeId && !neighbors.has(edge.target)) {
                 neighbors.set(edge.target, { id: edge.target, weight: edge.weight });
             }
         }
         if (direction === 'in' || direction === 'both') {
-            if (edge.target === nodeId && !neighbors.has(edge.source)) { // Add if not already present
+            if (edge.target === nodeId && !neighbors.has(edge.source)) {
                 neighbors.set(edge.source, { id: edge.source, weight: edge.weight });
             }
         }
@@ -237,7 +237,7 @@ export class GraphRAG {
     return this.getNeighbors(nodeId, { edgeType: hierarchyType, direction: 'out' });
   }
 
-  // --- 8. Random-Walk Hybrid Retrieval ---
+  // --- Random-Walk Hybrid Retrieval ---
 
   /**
    * Performs a random walk with restart, now with typed edge support.
@@ -258,10 +258,9 @@ export class GraphRAG {
         currentNodeId = startNodeId;
         continue;
       }
-      // Use the enhanced getNeighbors to walk along specific edge types
       const neighbors = this.getNeighbors(currentNodeId, { edgeType, direction: 'out' });
       if (neighbors.length === 0) {
-        currentNodeId = startNodeId; // Restart if at a dead end
+        currentNodeId = startNodeId;
         continue;
       }
 
@@ -286,7 +285,7 @@ export class GraphRAG {
     topK = 10,
     randomWalkSteps = 100,
     restartProb = 0.15,
-    walkEdgeType = 'semantic', // Allow specifying which relationships to explore
+    walkEdgeType = 'semantic',
   }: {
     queryEmbedding?: number[];
     seedNodeIds?: string[];
@@ -305,21 +304,20 @@ export class GraphRAG {
       if (queryEmbedding.length !== this.dimension) {
         throw new Error(`Query embedding must have dimension ${this.dimension}`);
       }
-      // 1. Find initial candidate set via dense search
-      initialScores = new Map(
-        Array.from(this.nodes.values())
-          .filter(n => n.embedding)
-          .map(node => [node.id, this.cosineSimilarity(queryEmbedding, node.embedding!)])
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, topK * 2) // Get a larger initial set for re-ranking
-      );
+      // Find initial candidate set via dense search
+      const candidateScores: Array<[string, number]> = Array.from(this.nodes.values())
+        .filter(n => n.embedding)
+        .map(node => [node.id, this.cosineSimilarity(queryEmbedding, node.embedding!)] as [string, number])
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, topK * 2);
+      
+      initialScores = new Map(candidateScores);
     } else {
       // Use provided seed nodes with a uniform initial score
-      initialScores = new Map(seedNodeIds!.map(id => [id, 1.0]));
+      initialScores = new Map(seedNodeIds!.map(id => [id, 1.0] as [string, number]));
     }
 
-
-    // 2. Re-rank nodes using random walk
+    // Re-rank nodes using random walk
     const rerankedScores = new Map<string, number>();
 
     // For each node in the initial set, perform a random walk
@@ -333,7 +331,7 @@ export class GraphRAG {
       }
     }
 
-    // 3. Format and return the top K results
+    // Format and return the top K results
     return Array.from(rerankedScores.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, topK)
@@ -343,8 +341,7 @@ export class GraphRAG {
       }));
   }
 
-
-  // --- Helper Methods (largely unchanged) ---
+  // --- Helper Methods ---
 
   private cosineSimilarity(vec1: number[], vec2: number[]): number {
     let dotProduct = 0;
@@ -369,29 +366,5 @@ export class GraphRAG {
       }
     }
     return neighbors[neighbors.length - 1]!.id;
-  }
-
-  /**
-   * @deprecated The monolithic createGraph is deprecated. Use a compositional approach:
-   * 1. Call `addNode` for each chunk.
-   * 2. Call `buildSemanticEdges`, `buildSequentialEdges`, etc. as needed.
-   * This method is kept for backward compatibility but may be removed in the future.
-   */
-  createGraph(chunks: GraphChunk[], embeddings: GraphEmbedding[], threshold: number = 0.7) {
-    console.warn("`createGraph` is deprecated. Please use `addNode` and `build...Edges` methods instead.");
-    if (chunks.length !== embeddings.length) throw new Error('Chunks and embeddings must have the same length');
-
-    // 1. Create nodes
-    chunks.forEach((chunk, index) => {
-      this.addNode({
-        id: index.toString(),
-        content: chunk.text,
-        embedding: embeddings[index]?.vector,
-        metadata: { ...chunk.metadata },
-      });
-    });
-
-    // 2. Build semantic edges (the old way)
-    this.buildSemanticEdges({ threshold });
   }
 }
