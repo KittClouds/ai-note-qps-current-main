@@ -254,12 +254,14 @@ const RichEditor = ({
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const previousContentRef = useRef<string>('');
 
-  // Listen for keyboard shortcut (Ctrl+\)
+  // Listen for keyboard shortcut (Ctrl+\) - use the localStorage-persisting handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
         e.preventDefault();
-        onToolbarVisibilityChange?.(!toolbarVisible);
+        if (onToolbarVisibilityChange) {
+          onToolbarVisibilityChange(!toolbarVisible);
+        }
       }
     };
 

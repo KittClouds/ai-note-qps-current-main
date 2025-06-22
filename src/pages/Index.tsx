@@ -1,3 +1,4 @@
+
 import { AppSidebar } from "@/components/app-sidebar"
 import RightSidebar from "@/components/RightSidebar"
 import { RightSidebarProvider, RightSidebarTrigger } from "@/components/RightSidebarProvider"
@@ -15,18 +16,36 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
+import { Button } from "@/components/ui/button"
+import { Menu } from "lucide-react"
 import RichEditor from "@/components/RichEditor";
 import { ConnectionsPanelContainer } from "@/components/ConnectionsPanelContainer";
 import { useTheme } from "next-themes";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { NotesProvider, useNotes } from "@/contexts/NotesContext";
 import { EntityManagerDrawer } from "@/components/entity-manager/EntityManagerDrawer";
 
 function NotesApp() {
   const { theme } = useTheme();
-  const [toolbarVisible, setToolbarVisible] = useState(true);
+  
+  // State with localStorage persistence
+  const [toolbarVisible, setToolbarVisible] = useState(() => {
+    const saved = localStorage.getItem('editor-toolbar-visible');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  
   const [connectionsOpen, setConnectionsOpen] = useState(true);
   const { selectedNote, updateNoteContent } = useNotes();
+
+  // Toggle handlers with localStorage persistence
+  const handleToggleToolbar = useCallback(() => {
+    setToolbarVisible(v => !v);
+  }, []);
+
+  const handleToolbarVisibilityChange = useCallback((visible: boolean) => {
+    setToolbarVisible(visible);
+    localStorage.setItem('editor-toolbar-visible', JSON.stringify(visible));
+  }, []);
 
   const handleEditorChange = (content: string) => {
     if (selectedNote) {
@@ -60,6 +79,15 @@ function NotesApp() {
                 </BreadcrumbList>
               </Breadcrumb>
               <div className="ml-auto flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleToggleToolbar}
+                  title={toolbarVisible ? 'Hide toolbar (Ctrl+\\)' : 'Show toolbar (Ctrl+\\)'}
+                >
+                  <Menu className="h-4 w-4" />
+                </Button>
                 <EntityManagerDrawer />
                 <RightSidebarTrigger />
               </div>
@@ -74,7 +102,7 @@ function NotesApp() {
                       onChange={handleEditorChange}
                       isDarkMode={theme === 'dark'}
                       toolbarVisible={toolbarVisible}
-                      onToolbarVisibilityChange={setToolbarVisible}
+                      onToolbarVisibilityChange={handleToolbarVisibilityChange}
                       noteId={selectedNote.id}
                     />
                   </div>
