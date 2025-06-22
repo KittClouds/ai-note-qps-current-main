@@ -15,6 +15,22 @@ export interface EmbeddingWorkerResponse {
   error?: string;
 }
 
+export interface SearchResult {
+  noteId: string;
+  title: string;
+  content: string;
+  score: number;
+  graphScore?: number;
+}
+
+export interface IndexStatus {
+  hasIndex: boolean;
+  indexSize: number;
+  needsRebuild: boolean;
+  graphNodes: number;
+  graphEdges: number;
+}
+
 export class EmbeddingsService {
   private worker: Worker | null = null;
   private graphRAG: GraphRAG;
@@ -22,6 +38,7 @@ export class EmbeddingsService {
   private isInitialized = false;
   private pendingRequests = new Map<string, { resolve: Function; reject: Function }>();
   private requestId = 0;
+  private noteMetadata = new Map<string, { title: string; noteId: string }>();
 
   constructor() {
     this.graphRAG = new GraphRAG(384); // 384-dimensional embeddings
@@ -126,11 +143,13 @@ export class EmbeddingsService {
           embedding: embeddings[index],
           metadata: {
             ...chunk.metadata,
-            originalNoteId: noteId
+            originalNoteId: noteId,
+            title: title
           }
         };
         
         this.graphRAG.addNode(node);
+        this.noteMetadata.set(nodeId, { title, noteId });
       });
 
       // Build sequential edges for chunks from the same note
@@ -193,7 +212,7 @@ export class EmbeddingsService {
   /**
    * Perform semantic search
    */
-  async search(query: string, topK: number = 10): Promise<RankedNode[]> {
+  async search(query: string, topK: number = 10): Promise<SearchResult[]> {
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -215,7 +234,16 @@ export class EmbeddingsService {
         walkEdgeType: 'semantic'
       });
 
-      return results;
+      // Convert to SearchResult format
+      return results.map(result => {
+        const metadata = this.noteMetadata.get(result.id);
+        return {
+          noteId: result.metadata?.originalNoteId || result.id,
+          title: metadata?.title || result.metadata?.title || 'Untitled',
+          content: result.content,
+          score: result.score
+        };
+      });
     } catch (error) {
       console.error('Semantic search failed:', error);
       throw error;
@@ -223,13 +251,36 @@ export class EmbeddingsService {
   }
 
   /**
-   * Get statistics about the knowledge graph
+   * Sync all notes to the embeddings index
    */
-  getStats(): { nodeCount: number; edgeCount: number; hnswStats: any } {
+  async syncAllNotes(notes: Array<{ id: string; title: string; content: string }>): Promise<number> {
+    let syncedCount = 0;
+    
+    for (const note of notes) {
+      try {
+        await this.addNote(note.id, note.title, note.content);
+        syncedCount++;
+      } catch (error) {
+        console.error(`Failed to sync note ${note.id}:`, error);
+      }
+    }
+    
+    return syncedCount;
+  }
+
+  /**
+   * Get the current index status
+   */
+  getIndexStatus(): IndexStatus {
+    const nodes = this.graphRAG.getNodes();
+    const edges = this.graphRAG.getEdges();
+    
     return {
-      nodeCount: this.graphRAG.getNodes().length,
-      edgeCount: this.graphRAG.getEdges().length,
-      hnswStats: this.hnswAdapter.getStats()
+      hasIndex: nodes.length > 0,
+      indexSize: nodes.length,
+      needsRebuild: false,
+      graphNodes: nodes.length,
+      graphEdges: edges.length
     };
   }
 

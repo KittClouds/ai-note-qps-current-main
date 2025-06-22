@@ -14,11 +14,27 @@ import {
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { FileTreeItem } from "./FileTreeItem"
+import { EnhancedSearchBar } from "./EnhancedSearchBar"
 import { useNotes } from "@/contexts/NotesContext"
+import { useState } from "react"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { createNote, createFolder, getItemsByParent } = useNotes();
+  const { createNote, createFolder, getItemsByParent, notes, selectNote } = useNotes();
+  const [searchQuery, setSearchQuery] = useState("");
   const rootItems = getItemsByParent(); // Items without a parent
+
+  // Filter items based on search query for text search
+  const filteredItems = searchQuery.trim() 
+    ? rootItems.filter(item => 
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.type === 'note' && item.content.toLowerCase().includes(searchQuery.toLowerCase()))
+      )
+    : rootItems;
+
+  const handleNoteSelect = (noteId: string) => {
+    selectNote(noteId);
+    setSearchQuery(""); // Clear search when selecting a note
+  };
 
   return (
     <Sidebar {...props}>
@@ -49,10 +65,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
+          <SidebarGroupLabel>Search</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <EnhancedSearchBar
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              notes={notes.filter(item => item.type === 'note')}
+              onNoteSelect={handleNoteSelect}
+              className="px-2"
+            />
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
           <SidebarGroupLabel>All Notes</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {rootItems.map((item) => (
+              {filteredItems.map((item) => (
                 <FileTreeItem key={item.id} item={item} />
               ))}
             </SidebarMenu>
