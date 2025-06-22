@@ -17,11 +17,15 @@ import { FileTreeItem } from "./FileTreeItem"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
 import { useNotes } from "@/contexts/NotesContext"
 import { useState } from "react"
+import { Note } from "@/types/notes"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { createNote, createFolder, getItemsByParent, notes, selectNote } = useNotes();
+  const { createNote, createFolder, getItemsByParent, state, selectItem } = useNotes();
   const [searchQuery, setSearchQuery] = useState("");
   const rootItems = getItemsByParent(); // Items without a parent
+
+  // Get all notes from the state for search functionality
+  const allNotes = state.items.filter(item => item.type === 'note') as Note[];
 
   // Filter items based on search query for text search
   const filteredItems = searchQuery.trim() 
@@ -32,7 +36,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     : rootItems;
 
   const handleNoteSelect = (noteId: string) => {
-    selectNote(noteId);
+    selectItem(noteId);
     setSearchQuery(""); // Clear search when selecting a note
   };
 
@@ -70,7 +74,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <EnhancedSearchBar
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
-              notes={notes.filter(item => item.type === 'note')}
+              notes={allNotes}
               onNoteSelect={handleNoteSelect}
               className="px-2"
             />
