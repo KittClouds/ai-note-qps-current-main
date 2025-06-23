@@ -4,6 +4,7 @@ import { Search, Loader2, Zap, Database, FileText } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { embeddingsService, SearchResult } from '@/lib/embeddings/embeddingsService';
@@ -26,7 +27,8 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   onNoteSelect,
   className = ''
 }) => {
-  const [searchMode, setSearchMode] = useState<'text' | 'semantic' | 'bm25'>('text');
+  const [searchMode, setSearchMode] = useState<'text' | 'semantic'>('text');
+  const [semanticSubMode, setSemanticSubMode] = useState<'semantic' | 'bm25'>('semantic');
   const [semanticResults, setSemanticResults] = useState<SearchResult[]>([]);
   const [bm25Results, setBm25Results] = useState<BM25SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -56,7 +58,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   }, []);
 
   const handleSemanticSearch = useDebouncedCallback(async (query: string) => {
-    if (!query.trim() || searchMode !== 'semantic') {
+    if (!query.trim() || searchMode !== 'semantic' || semanticSubMode !== 'semantic') {
       setSemanticResults([]);
       return;
     }
@@ -77,7 +79,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   }, 500);
 
   const handleBM25Search = useDebouncedCallback(async (query: string) => {
-    if (!query.trim() || searchMode !== 'bm25') {
+    if (!query.trim() || searchMode !== 'semantic' || semanticSubMode !== 'bm25') {
       setBm25Results([]);
       return;
     }
@@ -100,21 +102,40 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   const handleSearchChange = (value: string) => {
     onSearchChange(value);
     if (searchMode === 'semantic') {
-      handleSemanticSearch(value);
-    } else if (searchMode === 'bm25') {
-      handleBM25Search(value);
+      if (semanticSubMode === 'semantic') {
+        handleSemanticSearch(value);
+      } else {
+        handleBM25Search(value);
+      }
     }
   };
 
-  const handleModeChange = (mode: 'text' | 'semantic' | 'bm25') => {
+  const handleModeChange = (mode: 'text' | 'semantic') => {
     setSearchMode(mode);
     setSemanticResults([]);
     setBm25Results([]);
     
     if (mode === 'semantic' && searchQuery.trim()) {
-      handleSemanticSearch(searchQuery);
-    } else if (mode === 'bm25' && searchQuery.trim()) {
-      handleBM25Search(searchQuery);
+      if (semanticSubMode === 'semantic') {
+        handleSemanticSearch(searchQuery);
+      } else {
+        handleBM25Search(searchQuery);
+      }
+    }
+  };
+
+  const handleSemanticSubModeChange = (isBM25: boolean) => {
+    const newSubMode = isBM25 ? 'bm25' : 'semantic';
+    setSemanticSubMode(newSubMode);
+    setSemanticResults([]);
+    setBm25Results([]);
+    
+    if (searchMode === 'semantic' && searchQuery.trim()) {
+      if (newSubMode === 'semantic') {
+        handleSemanticSearch(searchQuery);
+      } else {
+        handleBM25Search(searchQuery);
+      }
     }
   };
 
@@ -163,25 +184,20 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   };
 
   const getSearchPlaceholder = () => {
-    switch (searchMode) {
-      case 'text':
-        return "Search notes... (Ctrl+K)";
-      case 'semantic':
-        return "Semantic search...";
-      case 'bm25':
-        return "BM25 search...";
-      default:
-        return "Search notes...";
+    if (searchMode === 'text') {
+      return "Search notes... (Ctrl+K)";
+    } else if (searchMode === 'semantic') {
+      return semanticSubMode === 'semantic' ? "Semantic search..." : "BM25 search...";
     }
+    return "Search notes...";
   };
 
   return (
     <div className={className}>
       <Tabs value={searchMode} onValueChange={handleModeChange} className="w-full mb-3">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="text" className="text-xs">Folders</TabsTrigger>
           <TabsTrigger value="semantic" className="text-xs">Semantic</TabsTrigger>
-          <TabsTrigger value="bm25" className="text-xs">BM25</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -200,54 +216,71 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
       </div>
 
       {searchMode === 'semantic' && (
-        <div className="space-y-2 mb-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full" 
-            onClick={handleSyncEmbeddings} 
-            disabled={isSyncing}
-          >
-            {isSyncing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Zap className="h-4 w-4 mr-2" />
-            )}
-            Sync Embeddings
-          </Button>
-          
-          <div className="flex items-center justify-center text-xs text-muted-foreground">
-            <Database className="h-3 w-3 mr-1" />
-            <span>{indexStatus.indexSize} embeddings</span>
+        <div className="space-y-3 mb-3">
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+            <div className="flex items-center space-x-2">
+              <Zap className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Semantic</span>
+            </div>
+            <Switch
+              checked={semanticSubMode === 'bm25'}
+              onCheckedChange={handleSemanticSubModeChange}
+            />
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-medium">BM25</span>
+              <FileText className="h-4 w-4 text-primary" />
+            </div>
           </div>
+
+          {semanticSubMode === 'semantic' ? (
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full" 
+                onClick={handleSyncEmbeddings} 
+                disabled={isSyncing}
+              >
+                {isSyncing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4 mr-2" />
+                )}
+                Sync Embeddings
+              </Button>
+              
+              <div className="flex items-center justify-center text-xs text-muted-foreground">
+                <Database className="h-3 w-3 mr-1" />
+                <span>{indexStatus.indexSize} embeddings</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full" 
+                onClick={handleSyncBM25} 
+                disabled={isSyncing}
+              >
+                {isSyncing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4 mr-2" />
+                )}
+                Sync BM25 Index
+              </Button>
+              
+              <div className="flex items-center justify-center text-xs text-muted-foreground">
+                <Database className="h-3 w-3 mr-1" />
+                <span>{bm25IndexStatus.totalDocuments} docs, {bm25IndexStatus.totalTerms} terms</span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {searchMode === 'bm25' && (
-        <div className="space-y-2 mb-3">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full" 
-            onClick={handleSyncBM25} 
-            disabled={isSyncing}
-          >
-            {isSyncing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <FileText className="h-4 w-4 mr-2" />
-            )}
-            Sync BM25 Index
-          </Button>
-          
-          <div className="flex items-center justify-center text-xs text-muted-foreground">
-            <Database className="h-3 w-3 mr-1" />
-            <span>{bm25IndexStatus.totalDocuments} docs, {bm25IndexStatus.totalTerms} terms</span>
-          </div>
-        </div>
-      )}
-
-      {searchMode === 'semantic' && searchQuery && semanticResults.length > 0 && (
+      {searchMode === 'semantic' && semanticSubMode === 'semantic' && searchQuery && semanticResults.length > 0 && (
         <div className="space-y-1 mb-3">
           {semanticResults.map(result => (
             <div 
@@ -269,7 +302,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
         </div>
       )}
 
-      {searchMode === 'bm25' && searchQuery && bm25Results.length > 0 && (
+      {searchMode === 'semantic' && semanticSubMode === 'bm25' && searchQuery && bm25Results.length > 0 && (
         <div className="space-y-1 mb-3">
           {bm25Results.map(result => (
             <div 
@@ -291,8 +324,9 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
         </div>
       )}
 
-      {((searchMode === 'semantic' && searchQuery && semanticResults.length === 0 && !isSearching) ||
-        (searchMode === 'bm25' && searchQuery && bm25Results.length === 0 && !isSearching)) && (
+      {searchMode === 'semantic' && searchQuery && 
+       ((semanticSubMode === 'semantic' && semanticResults.length === 0 && !isSearching) ||
+        (semanticSubMode === 'bm25' && bm25Results.length === 0 && !isSearching)) && (
         <div className="text-center text-muted-foreground py-4 mb-3">
           <p className="text-sm">No results found</p>
           <p className="text-xs">Try syncing the index first</p>
