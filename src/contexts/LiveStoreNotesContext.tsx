@@ -35,7 +35,6 @@ const NotesContext = createContext<NotesContextType | null>(null);
 const defaultContent = '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Start writing your note..."}]}]}';
 
 export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
-  // Fix: Properly access the store from LiveStore context
   const storeWrapper = useStore();
   const actualStore = storeWrapper?.store;
   
@@ -108,14 +107,19 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - New note object:', newNote);
 
     try {
-      // Create the event payload
+      // Create the event payload with proper null handling
       const noteCreatedEvent = events.noteCreated({
         id: newNote.id,
+        parentId: newNote.parentId || null, // Ensure consistent null for undefined
+        clusterId: null,
         title: newNote.title,
-        content: newNote.content,
-        parentId: newNote.parentId || null,
+        content: JSON.parse(newNote.content), // Parse content to array format
+        type: 'note',
         createdAt: newNote.createdAt,
-        updatedAt: newNote.updatedAt
+        updatedAt: newNote.updatedAt,
+        path: null,
+        tags: null,
+        mentions: null
       });
 
       console.log('LiveStore Debug - Committing note created event:', noteCreatedEvent);
@@ -167,12 +171,19 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - New folder object:', newFolder);
 
     try {
-      const folderCreatedEvent = events.folderCreated({
+      // Create folder event - need to check if this event exists in schema
+      const folderCreatedEvent = events.noteCreated({
         id: newFolder.id,
+        parentId: newFolder.parentId || null, // Ensure consistent null for undefined
+        clusterId: null,
         title: newFolder.title,
-        parentId: newFolder.parentId || null,
+        content: [], // Empty content for folders
+        type: 'folder',
         createdAt: newFolder.createdAt,
-        updatedAt: newFolder.updatedAt
+        updatedAt: newFolder.updatedAt,
+        path: null,
+        tags: null,
+        mentions: null
       });
 
       console.log('LiveStore Debug - Committing folder created event:', folderCreatedEvent);
@@ -369,9 +380,27 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // FIXED: Proper root item filtering logic
   const getItemsByParent = (parentId?: string): FileSystemItem[] => {
-    const filtered = processedItems.filter(item => item.parentId === parentId);
-    console.log('LiveStore Debug - Items by parent', parentId, ':', filtered.length, 'from total:', processedItems.length);
+    console.log('LiveStore Debug - Getting items by parent:', parentId);
+    console.log('LiveStore Debug - Total items available:', processedItems.length);
+    
+    // For root items (parentId is undefined), we want items where parentId is null or undefined
+    const filtered = processedItems.filter(item => {
+      if (parentId === undefined) {
+        // Root level: include items with null or undefined parentId
+        const isRoot = item.parentId === null || item.parentId === undefined;
+        console.log('LiveStore Debug - Item', item.id, 'parentId:', item.parentId, 'isRoot:', isRoot);
+        return isRoot;
+      } else {
+        // Specific parent: exact match
+        return item.parentId === parentId;
+      }
+    });
+    
+    console.log('LiveStore Debug - Filtered items for parent', parentId, ':', filtered.length);
+    console.log('LiveStore Debug - Filtered items:', filtered.map(item => ({ id: item.id, title: item.title, type: item.type, parentId: item.parentId })));
+    
     return filtered;
   };
 

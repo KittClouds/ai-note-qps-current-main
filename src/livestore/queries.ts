@@ -8,10 +8,22 @@ export const notes$ = queryDb(
   { label: 'notes$' }
 );
 
-export const folders$ = queryDb(
-  tables.folders.orderBy('createdAt', 'desc'),
-  { label: 'folders$' }
-);
+// Since we're using notes table for both notes and folders, let's create a folders query
+export const folders$ = computed((get) => {
+  try {
+    const allNotes = get(notes$);
+    console.log('LiveStore Query Debug - All notes from DB:', allNotes);
+    
+    // Filter items where type is 'folder'
+    const folders = Array.isArray(allNotes) ? allNotes.filter(item => item.type === 'folder') : [];
+    console.log('LiveStore Query Debug - Filtered folders:', folders);
+    
+    return folders;
+  } catch (error) {
+    console.error('LiveStore Query Debug - Error in folders$:', error);
+    return [];
+  }
+}, { label: 'folders$' });
 
 export const entityAttributes$ = queryDb(
   tables.entityAttributes.orderBy('updatedAt', 'desc'),
@@ -84,28 +96,34 @@ export const toolbarVisible$ = computed((get) => {
   }
 }, { label: 'toolbarVisible$' });
 
-// Combined items query with robust error handling
+// FIXED: Combined items query with better separation and proper root item handling
 export const allItems$ = computed((get) => {
   try {
-    const notes = get(notes$);
-    const folders = get(folders$);
+    const allNotes = get(notes$);
     
-    console.log('LiveStore Query Debug - Raw notes from DB:', notes);
-    console.log('LiveStore Query Debug - Raw folders from DB:', folders);
+    console.log('LiveStore Query Debug - Raw notes from DB:', allNotes);
     
     // Ensure we always work with arrays and handle null/undefined
-    const notesArray = Array.isArray(notes) ? notes : (notes ? [notes] : []);
-    const foldersArray = Array.isArray(folders) ? folders : (folders ? [folders] : []);
+    const notesArray = Array.isArray(allNotes) ? allNotes : (allNotes ? [allNotes] : []);
     
-    if (notesArray.length === 0 && foldersArray.length === 0) {
-      console.log('LiveStore Query Debug - No notes or folders found in database');
+    if (notesArray.length === 0) {
+      console.log('LiveStore Query Debug - No items found in database');
+      return [];
     }
     
-    const notesWithType = notesArray.map(note => ({ ...note, type: 'note' as const }));
-    const foldersWithType = foldersArray.map(folder => ({ ...folder, type: 'folder' as const }));
+    // Process all items and add consistent type field
+    const allItems = notesArray.map(item => ({
+      ...item,
+      type: item.type || 'note', // Ensure type is set
+      content: typeof item.content === 'string' ? item.content : JSON.stringify(item.content) // Ensure content is string
+    }));
     
-    const allItems = [...notesWithType, ...foldersWithType];
-    console.log('LiveStore Query Debug - Combined items:', allItems.length, 'total items');
+    console.log('LiveStore Query Debug - All processed items:', allItems.length, 'total items');
+    console.log('LiveStore Query Debug - Item breakdown:', {
+      notes: allItems.filter(item => item.type === 'note').length,
+      folders: allItems.filter(item => item.type === 'folder').length,
+      rootItems: allItems.filter(item => item.parentId === null || item.parentId === undefined).length
+    });
     
     return allItems;
   } catch (error) {
@@ -136,7 +154,18 @@ export const createItemsByParentQuery = (parentId?: string) => computed((get) =>
       console.warn('LiveStore Query Debug - allItems is not an array:', allItems);
       return [];
     }
-    const filtered = allItems.filter(item => item.parentId === parentId);
+    
+    // FIXED: Proper root item filtering
+    const filtered = allItems.filter(item => {
+      if (parentId === undefined) {
+        // Root level: include items with null or undefined parentId
+        return item.parentId === null || item.parentId === undefined;
+      } else {
+        // Specific parent: exact match
+        return item.parentId === parentId;
+      }
+    });
+    
     console.log('LiveStore Query Debug - Items by parent', parentId, ':', filtered.length, 'items');
     return filtered;
   } catch (error) {
