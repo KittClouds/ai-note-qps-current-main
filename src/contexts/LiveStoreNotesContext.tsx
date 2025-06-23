@@ -22,6 +22,7 @@ interface NotesContextType {
   createFolder: (parentId?: string) => Folder;
   renameItem: (id: string, newTitle: string) => void;
   deleteItem: (id: string) => void;
+  bulkDeleteItems: (ids: string[]) => Promise<void>;
   selectItem: (id: string) => void;
   updateNoteContent: (id: string, content: string) => void;
   toggleFolder: (id: string) => void;
@@ -335,6 +336,94 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const bulkDeleteItems = async (ids: string[]): Promise<void> => {
+    console.log('LiveStore Debug - Bulk deleting items:', ids);
+    
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for bulk deletion');
+      throw new Error('Store not available');
+    }
+
+    if (processedItems.length === 0) {
+      console.warn('LiveStore Debug - No items available for bulk deletion');
+      return;
+    }
+
+    try {
+      // Get all descendant IDs for all selected items
+      const getAllDescendants = (parentIds: string[]): string[] => {
+        const visited = new Set<string>();
+        const allDescendants = new Set<string>();
+        
+        const getDescendantsRecursive = (parentId: string): string[] => {
+          if (visited.has(parentId)) {
+            console.warn(`LiveStore Debug - Circular reference detected for item ${parentId}`);
+            return [];
+          }
+          
+          visited.add(parentId);
+          
+          const children = processedItems.filter(item => item.parentId === parentId);
+          const descendants = children.map(child => child.id);
+          
+          children.forEach(child => {
+            descendants.push(...getDescendantsRecursive(child.id));
+          });
+          
+          return descendants;
+        };
+
+        parentIds.forEach(parentId => {
+          const descendants = getDescendantsRecursive(parentId);
+          descendants.forEach(id => allDescendants.add(id));
+        });
+
+        return Array.from(allDescendants);
+      };
+
+      const allDescendants = getAllDescendants(ids);
+      const toDelete = new Set([...ids, ...allDescendants]);
+      
+      console.log('LiveStore Debug - Items to bulk delete:', Array.from(toDelete));
+      
+      // Batch delete all items
+      const deletePromises: Promise<void>[] = [];
+      
+      toDelete.forEach(itemId => {
+        const item = processedItems.find(item => item.id === itemId);
+        if (item) {
+          if (item.type === 'note') {
+            const noteDeletedEvent = events.noteDeleted({ id: itemId });
+            deletePromises.push(Promise.resolve(actualStore.commit(noteDeletedEvent)));
+          } else {
+            const folderDeletedEvent = events.folderDeleted({ id: itemId });
+            deletePromises.push(Promise.resolve(actualStore.commit(folderDeletedEvent)));
+          }
+        }
+      });
+
+      // Wait for all deletions to complete
+      await Promise.all(deletePromises);
+
+      // Update UI state if selected item was deleted
+      if (toDelete.has(processedSelectedId || '')) {
+        const newExpanded = processedExpandedFolders.filter(folderId => !toDelete.has(folderId));
+        const uiStateEvent = events.uiStateSet({
+          selectedItemId: null,
+          expandedFolders: newExpanded,
+          toolbarVisible: true
+        });
+        console.log('LiveStore Debug - Committing UI state event for bulk deletion:', uiStateEvent);
+        actualStore.commit(uiStateEvent);
+      }
+
+      console.log('LiveStore Debug - Bulk deletion completed successfully');
+    } catch (error) {
+      console.error('LiveStore Debug - Error during bulk deletion:', error);
+      throw error;
+    }
+  };
+
   const selectItem = (id: string) => {
     console.log('LiveStore Debug - Selecting item:', id);
     
@@ -499,6 +588,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       createFolder,
       renameItem,
       deleteItem,
+      bulkDeleteItems,
       selectItem,
       updateNoteContent,
       toggleFolder,

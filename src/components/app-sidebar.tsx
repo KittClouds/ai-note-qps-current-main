@@ -1,6 +1,6 @@
 
 import * as React from "react"
-import { Plus, FolderPlus } from "lucide-react"
+import { Plus, FolderPlus, CheckSquare } from "lucide-react"
 
 import {
   Sidebar,
@@ -14,13 +14,16 @@ import {
 } from "@/components/ui/sidebar"
 import { Button } from "@/components/ui/button"
 import { FileTreeItem } from "./FileTreeItem"
+import { BulkActionsToolbar } from "./BulkActionsToolbar"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
 import { useNotes } from "@/contexts/LiveStoreNotesContext"
+import { useBulkSelection } from "@/contexts/BulkSelectionContext"
 import { useState } from "react"
 import { Note } from "@/types/notes"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { createNote, createFolder, getItemsByParent, state, selectItem } = useNotes();
+  const { isSelectionMode, enterSelectionMode, hasSelection } = useBulkSelection();
   const [searchQuery, setSearchQuery] = useState("");
   const rootItems = getItemsByParent(); // Items without a parent
 
@@ -40,48 +43,72 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     setSearchQuery(""); // Clear search when selecting a note
   };
 
+  const allItemIds = state.items.map(item => item.id);
+
   return (
     <Sidebar {...props}>
       <SidebarHeader className="border-b">
         <div className="flex items-center justify-between p-2">
           <h2 className="text-lg font-semibold">Notes</h2>
           <div className="flex gap-1">
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="h-8 w-8 p-0"
-              onClick={() => createNote()}
-              title="New Note"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="ghost" 
-              className="h-8 w-8 p-0"
-              onClick={() => createFolder()}
-              title="New Folder"
-            >
-              <FolderPlus className="h-4 w-4" />
-            </Button>
+            {!isSelectionMode && (
+              <>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 w-8 p-0"
+                  onClick={() => createNote()}
+                  title="New Note"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 w-8 p-0"
+                  onClick={() => createFolder()}
+                  title="New Folder"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 w-8 p-0"
+                  onClick={enterSelectionMode}
+                  title="Bulk Select"
+                >
+                  <CheckSquare className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
+        {isSelectionMode && (
+          <BulkActionsToolbar allItemIds={allItemIds} />
+        )}
+        
+        {!isSelectionMode && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Search</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <EnhancedSearchBar
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                notes={allNotes}
+                onNoteSelect={handleNoteSelect}
+                className="px-2"
+              />
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+        
         <SidebarGroup>
-          <SidebarGroupLabel>Search</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <EnhancedSearchBar
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              notes={allNotes}
-              onNoteSelect={handleNoteSelect}
-              className="px-2"
-            />
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          <SidebarGroupLabel>All Notes</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            {isSelectionMode ? 'Select Items' : 'All Notes'}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {filteredItems.map((item) => (

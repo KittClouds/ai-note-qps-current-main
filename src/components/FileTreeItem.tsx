@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { ChevronRight, File, Folder, FolderPlus, Plus, Edit, Trash2, MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +12,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenuButton, SidebarMenuItem, SidebarMenuSub } from '@/components/ui/sidebar';
 import { InlineEditor } from './InlineEditor';
-import { useNotes } from '@/contexts/LiveStoreNotesContext'; // Fixed import
+import { useNotes } from '@/contexts/LiveStoreNotesContext';
+import { useBulkSelection } from '@/contexts/BulkSelectionContext';
 import { FileSystemItem } from '@/types/notes';
 
 interface FileTreeItemProps {
@@ -31,18 +33,30 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
     getItemsByParent 
   } = useNotes();
   
+  const { selectedIds, isSelectionMode, toggleSelection } = useBulkSelection();
   const [isRenaming, setIsRenaming] = useState(false);
 
   const isFolder = item.type === 'folder';
   const isExpanded = state.expandedFolders.has(item.id);
   const isSelected = state.selectedItemId === item.id;
+  const isChecked = selectedIds.has(item.id);
   const children = getItemsByParent(item.id);
 
   const handleClick = () => {
-    if (isFolder) {
+    if (isSelectionMode) {
+      toggleSelection(item.id);
+    } else if (isFolder) {
       toggleFolder(item.id);
     } else {
       selectItem(item.id);
+    }
+  };
+
+  const handleCheckboxChange = (checked: boolean) => {
+    if (checked) {
+      toggleSelection(item.id);
+    } else {
+      toggleSelection(item.id);
     }
   };
 
@@ -63,11 +77,21 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
     <>
       <SidebarMenuItem>
         <div className="group relative flex items-center w-full">
+          {isSelectionMode && (
+            <div className="flex-shrink-0 px-2">
+              <Checkbox
+                checked={isChecked}
+                onCheckedChange={handleCheckboxChange}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          )}
+
           <SidebarMenuButton
             className="flex-1 justify-start"
-            data-active={isSelected}
+            data-active={isSelected && !isSelectionMode}
             onClick={handleClick}
-            style={{ paddingLeft }}
+            style={{ paddingLeft: isSelectionMode ? '8px' : paddingLeft }}
           >
             {isFolder && (
               <ChevronRight 
@@ -89,7 +113,7 @@ export function FileTreeItem({ item, level = 0 }: FileTreeItemProps) {
           </SidebarMenuButton>
 
           {/* Dropdown Menu Button */}
-          {!isRenaming && (
+          {!isRenaming && !isSelectionMode && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
