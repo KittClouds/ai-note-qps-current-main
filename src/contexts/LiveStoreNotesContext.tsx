@@ -52,16 +52,42 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
   // Run migration on first load
   useEffect(() => {
-    if (store) {
+    if (store?.store) {
       console.log('LiveStore Debug - Running migration with store');
       // Create a migration-compatible object with commit function
       const migrationStore = {
-        commit: (event: any) => store.commit(event)
+        commit: (event: any) => {
+          console.log('LiveStore Debug - Migration committing event:', event);
+          // Access the actual store from the wrapper
+          const actualStore = (store as any).store;
+          if (actualStore && actualStore.commit) {
+            return actualStore.commit(event);
+          } else {
+            console.error('LiveStore Debug - No commit method found on actual store');
+          }
+        }
       };
       const migrationResult = migrateLegacyData(migrationStore as any);
       console.log('LiveStore Debug - Migration result:', migrationResult);
     }
   }, [store]);
+
+  // Helper function to commit events
+  const commitEvent = (event: any) => {
+    console.log('LiveStore Debug - Committing event:', event);
+    try {
+      // Try to access the actual store from the wrapper
+      const actualStore = (store as any)?.store;
+      if (actualStore && actualStore.commit) {
+        actualStore.commit(event);
+        console.log('LiveStore Debug - Event committed successfully');
+      } else {
+        console.error('LiveStore Debug - No commit method available');
+      }
+    } catch (error) {
+      console.error('LiveStore Debug - Error committing event:', error);
+    }
+  };
 
   // Convert to legacy state format
   const state: FileTreeState = {
@@ -101,23 +127,13 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
     console.log('LiveStore Debug - Event payload:', eventPayload);
 
-    try {
-      store.commit(events.noteCreated(eventPayload));
-      console.log('LiveStore Debug - Note created event committed');
-    } catch (error) {
-      console.error('LiveStore Debug - Error committing note created event:', error);
-    }
+    commitEvent(events.noteCreated(eventPayload));
     
-    try {
-      store.commit(events.uiStateSet({
-        selectedItemId: newNote.id,
-        expandedFolders: expandedFolders || [],
-        toolbarVisible: true
-      }));
-      console.log('LiveStore Debug - UI state updated');
-    } catch (error) {
-      console.error('LiveStore Debug - Error updating UI state:', error);
-    }
+    commitEvent(events.uiStateSet({
+      selectedItemId: newNote.id,
+      expandedFolders: expandedFolders || [],
+      toolbarVisible: true
+    }));
 
     return newNote;
   };
@@ -146,25 +162,15 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
     console.log('LiveStore Debug - Folder event payload:', eventPayload);
 
-    try {
-      store.commit(events.folderCreated(eventPayload));
-      console.log('LiveStore Debug - Folder created event committed');
-    } catch (error) {
-      console.error('LiveStore Debug - Error committing folder created event:', error);
-    }
+    commitEvent(events.folderCreated(eventPayload));
     
     // Add to expanded folders
     const newExpanded = [...(expandedFolders || []), newFolder.id];
-    try {
-      store.commit(events.uiStateSet({
-        selectedItemId: selectedItemId || null,
-        expandedFolders: newExpanded,
-        toolbarVisible: true
-      }));
-      console.log('LiveStore Debug - Folder UI state updated');
-    } catch (error) {
-      console.error('LiveStore Debug - Error updating folder UI state:', error);
-    }
+    commitEvent(events.uiStateSet({
+      selectedItemId: selectedItemId || null,
+      expandedFolders: newExpanded,
+      toolbarVisible: true
+    }));
 
     return newFolder;
   };
@@ -183,15 +189,10 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       updatedAt: new Date().toISOString() 
     };
 
-    try {
-      if (item.type === 'note') {
-        store.commit(events.noteUpdated({ id, updates, updatedAt: updates.updatedAt }));
-      } else {
-        store.commit(events.folderUpdated({ id, updates, updatedAt: updates.updatedAt }));
-      }
-      console.log('LiveStore Debug - Item renamed successfully');
-    } catch (error) {
-      console.error('LiveStore Debug - Error renaming item:', error);
+    if (item.type === 'note') {
+      commitEvent(events.noteUpdated({ id, updates, updatedAt: updates.updatedAt }));
+    } else {
+      commitEvent(events.folderUpdated({ id, updates, updatedAt: updates.updatedAt }));
     }
   };
 
@@ -229,32 +230,23 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     toDelete.forEach(itemId => {
       const item = allItems.find(item => item.id === itemId);
       if (item) {
-        try {
-          if (item.type === 'note') {
-            store.commit(events.noteDeleted({ id: itemId }));
-          } else {
-            store.commit(events.folderDeleted({ id: itemId }));
-          }
-          console.log('LiveStore Debug - Deleted item:', itemId);
-        } catch (error) {
-          console.error('LiveStore Debug - Error deleting item:', itemId, error);
+        if (item.type === 'note') {
+          commitEvent(events.noteDeleted({ id: itemId }));
+        } else {
+          commitEvent(events.folderDeleted({ id: itemId }));
         }
+        console.log('LiveStore Debug - Deleted item:', itemId);
       }
     });
 
     // Update UI state if selected item was deleted
     if (toDelete.has(selectedItemId || '')) {
       const newExpanded = (expandedFolders || []).filter(folderId => !toDelete.has(folderId));
-      try {
-        store.commit(events.uiStateSet({
-          selectedItemId: null,
-          expandedFolders: newExpanded,
-          toolbarVisible: true
-        }));
-        console.log('LiveStore Debug - UI state updated after deletion');
-      } catch (error) {
-        console.error('LiveStore Debug - Error updating UI state after deletion:', error);
-      }
+      commitEvent(events.uiStateSet({
+        selectedItemId: null,
+        expandedFolders: newExpanded,
+        toolbarVisible: true
+      }));
     }
   };
 
@@ -263,32 +255,22 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     
     const item = allItems?.find(item => item.id === id);
     if (item && item.type === 'note') {
-      try {
-        store.commit(events.uiStateSet({
-          selectedItemId: id,
-          expandedFolders: expandedFolders || [],
-          toolbarVisible: true
-        }));
-        console.log('LiveStore Debug - Item selected successfully');
-      } catch (error) {
-        console.error('LiveStore Debug - Error selecting item:', error);
-      }
+      commitEvent(events.uiStateSet({
+        selectedItemId: id,
+        expandedFolders: expandedFolders || [],
+        toolbarVisible: true
+      }));
     }
   };
 
   const updateNoteContent = (id: string, content: string) => {
     console.log('LiveStore Debug - Updating note content:', id);
     
-    try {
-      store.commit(events.noteUpdated({ 
-        id, 
-        updates: { content }, 
-        updatedAt: new Date().toISOString() 
-      }));
-      console.log('LiveStore Debug - Note content updated successfully');
-    } catch (error) {
-      console.error('LiveStore Debug - Error updating note content:', error);
-    }
+    commitEvent(events.noteUpdated({ 
+      id, 
+      updates: { content }, 
+      updatedAt: new Date().toISOString() 
+    }));
   };
 
   const toggleFolder = (id: string) => {
@@ -299,16 +281,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       ? currentExpanded.filter(folderId => folderId !== id)
       : [...currentExpanded, id];
 
-    try {
-      store.commit(events.uiStateSet({
-        selectedItemId: selectedItemId || null,
-        expandedFolders: newExpanded,
-        toolbarVisible: true
-      }));
-      console.log('LiveStore Debug - Folder toggled successfully');
-    } catch (error) {
-      console.error('LiveStore Debug - Error toggling folder:', error);
-    }
+    commitEvent(events.uiStateSet({
+      selectedItemId: selectedItemId || null,
+      expandedFolders: newExpanded,
+      toolbarVisible: true
+    }));
   };
 
   const getItemsByParent = (parentId?: string): FileSystemItem[] => {
@@ -367,16 +344,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   };
 
   const setEntityAttributes = (entityKey: string, attributes: Record<string, any>) => {
-    try {
-      store.commit(events.entityAttributesUpdated({
-        entityKey,
-        attributes,
-        updatedAt: new Date().toISOString()
-      }));
-      console.log('LiveStore Debug - Entity attributes updated successfully');
-    } catch (error) {
-      console.error('LiveStore Debug - Error updating entity attributes:', error);
-    }
+    commitEvent(events.entityAttributesUpdated({
+      entityKey,
+      attributes,
+      updatedAt: new Date().toISOString()
+    }));
   };
 
   return (
