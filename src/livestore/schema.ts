@@ -136,28 +136,57 @@ export const events = {
 
 // Create materializers to update database state based on events
 const materializers = State.SQLite.materializers(events, {
-  'v1.NoteCreated': ({ id, title, content, parentId, createdAt, updatedAt }) =>
-    tables.notes.insert({ id, title, content, parentId, createdAt, updatedAt }),
+  'v1.NoteCreated': ({ id, title, content, parentId, createdAt, updatedAt }) => {
+    console.log('LiveStore Materializer Debug - Note Created:', { id, title, content, parentId, createdAt, updatedAt });
+    const result = tables.notes.insert({ id, title, content, parentId, createdAt, updatedAt });
+    console.log('LiveStore Materializer Debug - Note insert result:', result);
+    return result;
+  },
 
-  'v1.NoteUpdated': ({ id, updates, updatedAt }) =>
-    tables.notes.update({ ...updates, updatedAt }).where({ id }),
+  'v1.NoteUpdated': ({ id, updates, updatedAt }) => {
+    console.log('LiveStore Materializer Debug - Note Updated:', { id, updates, updatedAt });
+    const result = tables.notes.update({ ...updates, updatedAt }).where({ id });
+    console.log('LiveStore Materializer Debug - Note update result:', result);
+    return result;
+  },
 
-  'v1.NoteDeleted': ({ id }) =>
-    tables.notes.delete().where({ id }),
+  'v1.NoteDeleted': ({ id }) => {
+    console.log('LiveStore Materializer Debug - Note Deleted:', { id });
+    const result = tables.notes.delete().where({ id });
+    console.log('LiveStore Materializer Debug - Note delete result:', result);
+    return result;
+  },
 
-  'v1.FolderCreated': ({ id, title, parentId, createdAt, updatedAt }) =>
-    tables.folders.insert({ id, title, parentId, createdAt, updatedAt }),
+  'v1.FolderCreated': ({ id, title, parentId, createdAt, updatedAt }) => {
+    console.log('LiveStore Materializer Debug - Folder Created:', { id, title, parentId, createdAt, updatedAt });
+    const result = tables.folders.insert({ id, title, parentId, createdAt, updatedAt });
+    console.log('LiveStore Materializer Debug - Folder insert result:', result);
+    return result;
+  },
 
-  'v1.FolderUpdated': ({ id, updates, updatedAt }) =>
-    tables.folders.update({ ...updates, updatedAt }).where({ id }),
+  'v1.FolderUpdated': ({ id, updates, updatedAt }) => {
+    console.log('LiveStore Materializer Debug - Folder Updated:', { id, updates, updatedAt });
+    const result = tables.folders.update({ ...updates, updatedAt }).where({ id });
+    console.log('LiveStore Materializer Debug - Folder update result:', result);
+    return result;
+  },
 
-  'v1.FolderDeleted': ({ id }) =>
-    tables.folders.delete().where({ id }),
+  'v1.FolderDeleted': ({ id }) => {
+    console.log('LiveStore Materializer Debug - Folder Deleted:', { id });
+    const result = tables.folders.delete().where({ id });
+    console.log('LiveStore Materializer Debug - Folder delete result:', result);
+    return result;
+  },
 
-  'v1.EntityAttributesUpdated': ({ entityKey, attributes, updatedAt }) => [
-    tables.entityAttributes.delete().where({ entityKey }),
-    tables.entityAttributes.insert({ entityKey, attributes, createdAt: updatedAt, updatedAt })
-  ]
+  'v1.EntityAttributesUpdated': ({ entityKey, attributes, updatedAt }) => {
+    console.log('LiveStore Materializer Debug - Entity Attributes Updated:', { entityKey, attributes, updatedAt });
+    const result = [
+      tables.entityAttributes.delete().where({ entityKey }),
+      tables.entityAttributes.insert({ entityKey, attributes, createdAt: updatedAt, updatedAt })
+    ];
+    console.log('LiveStore Materializer Debug - Entity attributes result:', result);
+    return result;
+  }
 });
 
 // Create the state with tables and materializers
