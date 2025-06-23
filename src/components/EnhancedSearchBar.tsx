@@ -4,7 +4,6 @@ import { Search, Loader2, Zap, Database, FileText, Blend } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
@@ -22,6 +21,9 @@ interface EnhancedSearchBarProps {
   className?: string;
 }
 
+type SearchMode = 'text' | 'semantic';
+type SemanticMode = 'semantic' | 'bm25' | 'hybrid';
+
 export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   searchQuery,
   onSearchChange,
@@ -29,8 +31,8 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   onNoteSelect,
   className = ''
 }) => {
-  const [searchMode, setSearchMode] = useState<'text' | 'semantic' | 'hybrid'>('text');
-  const [semanticSubMode, setSemanticSubMode] = useState<'semantic' | 'bm25'>('semantic');
+  const [searchMode, setSearchMode] = useState<SearchMode>('text');
+  const [semanticMode, setSemanticMode] = useState<SemanticMode>('semantic');
   const [semanticResults, setSemanticResults] = useState<SearchResult[]>([]);
   const [bm25Results, setBm25Results] = useState<BM25SearchResult[]>([]);
   const [hybridResults, setHybridResults] = useState<HybridSearchResult[]>([]);
@@ -61,7 +63,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   }, []);
 
   const handleSemanticSearch = useDebouncedCallback(async (query: string) => {
-    if (!query.trim() || searchMode !== 'semantic' || semanticSubMode !== 'semantic') {
+    if (!query.trim() || searchMode !== 'semantic' || semanticMode !== 'semantic') {
       setSemanticResults([]);
       return;
     }
@@ -82,7 +84,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   }, 500);
 
   const handleBM25Search = useDebouncedCallback(async (query: string) => {
-    if (!query.trim() || searchMode !== 'semantic' || semanticSubMode !== 'bm25') {
+    if (!query.trim() || searchMode !== 'semantic' || semanticMode !== 'bm25') {
       setBm25Results([]);
       return;
     }
@@ -103,7 +105,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   }, 300);
 
   const handleHybridSearch = useDebouncedCallback(async (query: string) => {
-    if (!query.trim() || searchMode !== 'hybrid') {
+    if (!query.trim() || searchMode !== 'semantic' || semanticMode !== 'hybrid') {
       setHybridResults([]);
       return;
     }
@@ -129,44 +131,46 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   const handleSearchChange = (value: string) => {
     onSearchChange(value);
     if (searchMode === 'semantic') {
-      if (semanticSubMode === 'semantic') {
+      if (semanticMode === 'semantic') {
         handleSemanticSearch(value);
-      } else {
+      } else if (semanticMode === 'bm25') {
         handleBM25Search(value);
+      } else if (semanticMode === 'hybrid') {
+        handleHybridSearch(value);
       }
-    } else if (searchMode === 'hybrid') {
-      handleHybridSearch(value);
     }
   };
 
-  const handleModeChange = (mode: 'text' | 'semantic' | 'hybrid') => {
+  const handleModeChange = (mode: SearchMode) => {
     setSearchMode(mode);
     setSemanticResults([]);
     setBm25Results([]);
     setHybridResults([]);
     
     if (mode === 'semantic' && searchQuery.trim()) {
-      if (semanticSubMode === 'semantic') {
+      if (semanticMode === 'semantic') {
         handleSemanticSearch(searchQuery);
-      } else {
+      } else if (semanticMode === 'bm25') {
         handleBM25Search(searchQuery);
+      } else if (semanticMode === 'hybrid') {
+        handleHybridSearch(searchQuery);
       }
-    } else if (mode === 'hybrid' && searchQuery.trim()) {
-      handleHybridSearch(searchQuery);
     }
   };
 
-  const handleSemanticSubModeChange = (isBM25: boolean) => {
-    const newSubMode = isBM25 ? 'bm25' : 'semantic';
-    setSemanticSubMode(newSubMode);
+  const handleSemanticModeChange = (mode: SemanticMode) => {
+    setSemanticMode(mode);
     setSemanticResults([]);
     setBm25Results([]);
+    setHybridResults([]);
     
     if (searchMode === 'semantic' && searchQuery.trim()) {
-      if (newSubMode === 'semantic') {
+      if (mode === 'semantic') {
         handleSemanticSearch(searchQuery);
-      } else {
+      } else if (mode === 'bm25') {
         handleBM25Search(searchQuery);
+      } else if (mode === 'hybrid') {
+        handleHybridSearch(searchQuery);
       }
     }
   };
@@ -241,7 +245,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
 
   const handleAlphaChange = (value: number[]) => {
     setAlpha(value);
-    if (searchMode === 'hybrid' && searchQuery.trim()) {
+    if (searchMode === 'semantic' && semanticMode === 'hybrid' && searchQuery.trim()) {
       handleHybridSearch(searchQuery);
     }
   };
@@ -250,9 +254,9 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
     if (searchMode === 'text') {
       return "Search notes... (Ctrl+K)";
     } else if (searchMode === 'semantic') {
-      return semanticSubMode === 'semantic' ? "Semantic search..." : "BM25 search...";
-    } else if (searchMode === 'hybrid') {
-      return "Hybrid search (keyword + semantic)...";
+      if (semanticMode === 'semantic') return "Semantic search...";
+      if (semanticMode === 'bm25') return "BM25 search...";
+      if (semanticMode === 'hybrid') return "Hybrid search (keyword + semantic)...";
     }
     return "Search notes...";
   };
@@ -260,10 +264,9 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   return (
     <div className={className}>
       <Tabs value={searchMode} onValueChange={handleModeChange} className="w-full mb-3">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="text" className="text-xs">Folders</TabsTrigger>
           <TabsTrigger value="semantic" className="text-xs">Semantic</TabsTrigger>
-          <TabsTrigger value="hybrid" className="text-xs">Hybrid</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -286,19 +289,64 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
           <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
             <div className="flex items-center space-x-2">
               <Zap className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Semantic</span>
+              <button
+                onClick={() => handleSemanticModeChange('semantic')}
+                className={`text-sm font-medium transition-colors ${
+                  semanticMode === 'semantic' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Semantic
+              </button>
             </div>
-            <Switch
-              checked={semanticSubMode === 'bm25'}
-              onCheckedChange={handleSemanticSubModeChange}
-            />
+            
             <div className="flex items-center space-x-2">
-              <span className="text-sm font-medium">BM25</span>
               <FileText className="h-4 w-4 text-primary" />
+              <button
+                onClick={() => handleSemanticModeChange('bm25')}
+                className={`text-sm font-medium transition-colors ${
+                  semanticMode === 'bm25' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                BM25
+              </button>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Blend className="h-4 w-4 text-primary" />
+              <button
+                onClick={() => handleSemanticModeChange('hybrid')}
+                className={`text-sm font-medium transition-colors ${
+                  semanticMode === 'hybrid' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                Hybrid
+              </button>
             </div>
           </div>
 
-          {semanticSubMode === 'semantic' ? (
+          {semanticMode === 'hybrid' && (
+            <div className="p-3 bg-muted/20 rounded-lg space-y-3">
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>Keyword</span>
+                  <span>Semantic</span>
+                </div>
+                <Slider
+                  value={alpha}
+                  onValueChange={handleAlphaChange}
+                  max={1}
+                  min={0}
+                  step={0.05}
+                  className="w-full"
+                />
+                <div className="text-center text-xs text-muted-foreground">
+                  Alpha: {alpha[0].toFixed(2)}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {semanticMode === 'semantic' && (
             <>
               <Button 
                 variant="outline" 
@@ -320,7 +368,9 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
                 <span>{indexStatus.indexSize} embeddings</span>
               </div>
             </>
-          ) : (
+          )}
+
+          {semanticMode === 'bm25' && (
             <>
               <Button 
                 variant="outline" 
@@ -343,59 +393,34 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
               </div>
             </>
           )}
+
+          {semanticMode === 'hybrid' && (
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full" 
+                onClick={handleSyncHybrid} 
+                disabled={isSyncing}
+              >
+                {isSyncing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Blend className="h-4 w-4 mr-2" />
+                )}
+                Sync Hybrid Indexes
+              </Button>
+              
+              <div className="flex items-center justify-center text-xs text-muted-foreground">
+                <Database className="h-3 w-3 mr-1" />
+                <span>BM25: {bm25IndexStatus.totalDocuments} | Embeddings: {indexStatus.indexSize}</span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {searchMode === 'hybrid' && (
-        <div className="space-y-3 mb-3">
-          <div className="p-3 bg-muted/30 rounded-lg space-y-3">
-            <div className="flex items-center justify-center space-x-2">
-              <Blend className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Hybrid Search</span>
-            </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>Keyword</span>
-                <span>Semantic</span>
-              </div>
-              <Slider
-                value={alpha}
-                onValueChange={handleAlphaChange}
-                max={1}
-                min={0}
-                step={0.05}
-                className="w-full"
-              />
-              <div className="text-center text-xs text-muted-foreground">
-                Alpha: {alpha[0].toFixed(2)}
-              </div>
-            </div>
-          </div>
-
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full" 
-            onClick={handleSyncHybrid} 
-            disabled={isSyncing}
-          >
-            {isSyncing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Blend className="h-4 w-4 mr-2" />
-            )}
-            Sync Hybrid Indexes
-          </Button>
-          
-          <div className="flex items-center justify-center text-xs text-muted-foreground">
-            <Database className="h-3 w-3 mr-1" />
-            <span>BM25: {bm25IndexStatus.totalDocuments} | Embeddings: {indexStatus.indexSize}</span>
-          </div>
-        </div>
-      )}
-
-      {searchMode === 'semantic' && semanticSubMode === 'semantic' && searchQuery && semanticResults.length > 0 && (
+      {searchMode === 'semantic' && semanticMode === 'semantic' && searchQuery && semanticResults.length > 0 && (
         <div className="space-y-1 mb-3">
           {semanticResults.map(result => (
             <div 
@@ -417,7 +442,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
         </div>
       )}
 
-      {searchMode === 'semantic' && semanticSubMode === 'bm25' && searchQuery && bm25Results.length > 0 && (
+      {searchMode === 'semantic' && semanticMode === 'bm25' && searchQuery && bm25Results.length > 0 && (
         <div className="space-y-1 mb-3">
           {bm25Results.map(result => (
             <div 
@@ -439,7 +464,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
         </div>
       )}
 
-      {searchMode === 'hybrid' && searchQuery && hybridResults.length > 0 && (
+      {searchMode === 'semantic' && semanticMode === 'hybrid' && searchQuery && hybridResults.length > 0 && (
         <div className="space-y-1 mb-3">
           {hybridResults.map(result => (
             <div 
@@ -466,18 +491,12 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
       )}
 
       {searchMode === 'semantic' && searchQuery && 
-       ((semanticSubMode === 'semantic' && semanticResults.length === 0 && !isSearching) ||
-        (semanticSubMode === 'bm25' && bm25Results.length === 0 && !isSearching)) && (
+       ((semanticMode === 'semantic' && semanticResults.length === 0 && !isSearching) ||
+        (semanticMode === 'bm25' && bm25Results.length === 0 && !isSearching) ||
+        (semanticMode === 'hybrid' && hybridResults.length === 0 && !isSearching)) && (
         <div className="text-center text-muted-foreground py-4 mb-3">
           <p className="text-sm">No results found</p>
           <p className="text-xs">Try syncing the index first</p>
-        </div>
-      )}
-
-      {searchMode === 'hybrid' && searchQuery && hybridResults.length === 0 && !isSearching && (
-        <div className="text-center text-muted-foreground py-4 mb-3">
-          <p className="text-sm">No hybrid results found</p>
-          <p className="text-xs">Try syncing both indexes first</p>
         </div>
       )}
     </div>
