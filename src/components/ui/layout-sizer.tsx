@@ -26,6 +26,7 @@ export function LayoutSizer({
       style={{
         height: dimensions.availableHeight,
         width: dimensions.availableWidth,
+        transition: 'width 0.2s ease-linear',
         ...style
       }}
       {...props}

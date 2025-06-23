@@ -59,7 +59,7 @@ function NotesApp() {
       <RightSidebarProvider>
         <div className="min-h-screen flex w-full bg-background">
           <AppSidebar />
-          <SidebarInset className="flex flex-col">
+          <SidebarInset className="flex flex-col transition-all duration-200 ease-linear">
             <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
               <SidebarTrigger className="-ml-1" />
               <Separator
@@ -95,14 +95,14 @@ function NotesApp() {
               </div>
             </header>
             
-            <div className="flex-1 flex flex-col min-h-0 bg-background">
+            <LayoutSizer 
+              className="flex-1 flex flex-col min-h-0"
+              includeConnections={connectionsOpen}
+              includeToolbar={toolbarVisible}
+            >
               {selectedNote ? (
                 <>
-                  <LayoutSizer 
-                    className="flex-1 min-h-0"
-                    includeConnections={connectionsOpen}
-                    includeToolbar={toolbarVisible}
-                  >
+                  <div className="flex-1 min-h-0">
                     <RichEditor
                       content={selectedNote.content}
                       onChange={handleEditorChange}
@@ -111,14 +111,14 @@ function NotesApp() {
                       onToolbarVisibilityChange={handleToolbarVisibilityChange}
                       noteId={selectedNote.id}
                     />
-                  </LayoutSizer>
+                  </div>
                   <ConnectionsPanelContainer 
                     isOpen={connectionsOpen}
                     onToggle={() => setConnectionsOpen(!connectionsOpen)}
                   />
                 </>
               ) : (
-                <LayoutSizer className="flex flex-col items-center justify-center bg-background">
+                <div className="flex flex-col items-center justify-center bg-background h-full">
                   <div className="text-center space-y-6 max-w-md mx-auto px-6">
                     <div className="text-8xl mb-6 opacity-60">📝</div>
                     <div className="space-y-4">
@@ -133,9 +133,9 @@ function NotesApp() {
                       </Button>
                     </div>
                   </div>
-                </LayoutSizer>
+                </div>
               )}
-            </div>
+            </LayoutSizer>
           </SidebarInset>
           <RightSidebar />
         </div>
