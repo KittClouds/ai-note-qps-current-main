@@ -13,6 +13,7 @@ import {
   entityAttributes$
 } from '@/livestore/queries';
 import { migrateLegacyData } from '@/livestore/migration';
+import { useToast } from '@/hooks/use-toast';
 
 interface NotesContextType {
   state: FileTreeState;
@@ -37,6 +38,7 @@ const defaultContent = '{"type":"doc","content":[{"type":"paragraph","content":[
 export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const storeWrapper = useStore();
   const actualStore = storeWrapper?.store;
+  const { toast } = useToast();
   
   const allItems = useQuery(allItems$);
   const selectedItemId = useQuery(selectedItemId$);
@@ -82,6 +84,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     
     if (!actualStore) {
       console.error('LiveStore Debug - No actual store available for note creation');
+      toast({
+        title: "Error",
+        description: "Unable to create note: Store not available",
+        variant: "destructive"
+      });
       const fallbackNote: Note = {
         id: uuidv4(),
         title: 'Untitled',
@@ -131,8 +138,20 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       actualStore.commit(uiStateEvent);
 
       console.log('LiveStore Debug - Note creation completed successfully');
+      
+      // Show success toast
+      toast({
+        title: "Success",
+        description: "Note created successfully",
+      });
+      
     } catch (error) {
       console.error('LiveStore Debug - Error creating note:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create note",
+        variant: "destructive"
+      });
     }
 
     return newNote;
@@ -143,6 +162,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     
     if (!actualStore) {
       console.error('LiveStore Debug - No actual store available for folder creation');
+      toast({
+        title: "Error",
+        description: "Unable to create folder: Store not available",
+        variant: "destructive"
+      });
       const fallbackFolder: Folder = {
         id: uuidv4(),
         title: 'Untitled Folder',
@@ -190,8 +214,20 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       actualStore.commit(uiStateEvent);
 
       console.log('LiveStore Debug - Folder creation completed successfully');
+      
+      // Show success toast
+      toast({
+        title: "Success",
+        description: "Folder created successfully",
+      });
+      
     } catch (error) {
       console.error('LiveStore Debug - Error creating folder:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create folder",
+        variant: "destructive"
+      });
     }
 
     return newFolder;

@@ -8,22 +8,11 @@ export const notes$ = queryDb(
   { label: 'notes$' }
 );
 
-// Since we're using notes table for both notes and folders, let's create a folders query
-export const folders$ = computed((get) => {
-  try {
-    const allNotes = get(notes$);
-    console.log('LiveStore Query Debug - All notes from DB:', allNotes);
-    
-    // Filter items where type is 'folder'
-    const folders = Array.isArray(allNotes) ? allNotes.filter(item => item.type === 'folder') : [];
-    console.log('LiveStore Query Debug - Filtered folders:', folders);
-    
-    return folders;
-  } catch (error) {
-    console.error('LiveStore Query Debug - Error in folders$:', error);
-    return [];
-  }
-}, { label: 'folders$' });
+// FIXED: Use the actual folders table instead of filtering notes
+export const folders$ = queryDb(
+  tables.folders.orderBy('createdAt', 'desc'),
+  { label: 'folders$' }
+);
 
 export const entityAttributes$ = queryDb(
   tables.entityAttributes.orderBy('updatedAt', 'desc'),
@@ -96,32 +85,40 @@ export const toolbarVisible$ = computed((get) => {
   }
 }, { label: 'toolbarVisible$' });
 
-// FIXED: Combined items query with better separation and proper root item handling
+// FIXED: Combined items query that properly merges notes and folders from their respective tables
 export const allItems$ = computed((get) => {
   try {
     const allNotes = get(notes$);
+    const allFolders = get(folders$);
     
-    console.log('LiveStore Query Debug - Raw notes from DB:', allNotes);
+    console.log('LiveStore Query Debug - Raw notes from notes table:', allNotes);
+    console.log('LiveStore Query Debug - Raw folders from folders table:', allFolders);
     
-    // Ensure we always work with arrays and handle null/undefined
+    // Ensure we always work with arrays
     const notesArray = Array.isArray(allNotes) ? allNotes : (allNotes ? [allNotes] : []);
+    const foldersArray = Array.isArray(allFolders) ? allFolders : (allFolders ? [allFolders] : []);
     
-    if (notesArray.length === 0) {
-      console.log('LiveStore Query Debug - No items found in database');
-      return [];
-    }
-    
-    // Process all items and add consistent type field
-    const allItems = notesArray.map(item => ({
-      ...item,
-      type: item.type || 'note', // Ensure type is set
-      content: typeof item.content === 'string' ? item.content : JSON.stringify(item.content) // Ensure content is string
+    // Process notes - add type field and ensure content is string
+    const processedNotes = notesArray.map(note => ({
+      ...note,
+      type: 'note' as const,
+      content: typeof note.content === 'string' ? note.content : JSON.stringify(note.content)
     }));
     
-    console.log('LiveStore Query Debug - All processed items:', allItems.length, 'total items');
+    // Process folders - add type field
+    const processedFolders = foldersArray.map(folder => ({
+      ...folder,
+      type: 'folder' as const,
+      content: '' // Folders don't have content
+    }));
+    
+    // Combine all items
+    const allItems = [...processedNotes, ...processedFolders];
+    
+    console.log('LiveStore Query Debug - Combined items:', allItems.length, 'total items');
     console.log('LiveStore Query Debug - Item breakdown:', {
-      notes: allItems.filter(item => item.type === 'note').length,
-      folders: allItems.filter(item => item.type === 'folder').length,
+      notes: processedNotes.length,
+      folders: processedFolders.length,
       rootItems: allItems.filter(item => item.parentId === null || item.parentId === undefined).length
     });
     
