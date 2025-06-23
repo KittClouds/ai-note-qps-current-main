@@ -1,3 +1,4 @@
+
 export { HNSW } from './HNSW';
 export { Node } from './HNSW/node';
 export { PriorityQueue } from './HNSW/pqueue';
@@ -13,3 +14,7 @@ export { chunkText, extractTextFromTipTapDocument, createNoteChunks, type TextCh
 export { SemanticChunker, semanticChunker } from './semanticChunking';
 export { SEMANTIC_CHUNKING_CONFIG, type SemanticChunkingOptions, type SemanticChunk } from './semanticChunkingConfig';
 export { chunkitSemantic, cramitBasic, sentenceitSplit, createNoteChunksSemantic } from './textProcessing';
+
+// BM25 exports
+export { default as BM25, type BMDocument, type BMConstants, type BMSorter } from '../bm25/bm25';
+export { BM25Service, bm25Service, type BM25SearchResult, type BM25IndexStatus } from '../bm25/bm25Service';
