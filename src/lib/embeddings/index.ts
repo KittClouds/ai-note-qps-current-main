@@ -18,3 +18,6 @@ export { chunkitSemantic, cramitBasic, sentenceitSplit, createNoteChunksSemantic
 // BM25 exports
 export { default as BM25, type BMDocument, type BMConstants, type BMSorter } from '../bm25/bm25';
 export { BM25Service, bm25Service, type BM25SearchResult, type BM25IndexStatus } from '../bm25/bm25Service';
+
+// Hybrid Search exports
+export { hybridSearchService, HybridSearchService, type HybridSearchResult, type HybridSearchOptions } from '../search/hybridSearchService';
