@@ -107,19 +107,14 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - New note object:', newNote);
 
     try {
-      // Create the event payload with proper null handling
+      // Create the event payload with only the fields that exist in the schema
       const noteCreatedEvent = events.noteCreated({
         id: newNote.id,
-        parentId: newNote.parentId || null, // Ensure consistent null for undefined
-        clusterId: null,
         title: newNote.title,
-        content: JSON.parse(newNote.content), // Parse content to array format
-        type: 'note',
+        content: newNote.content, // Keep as string
+        parentId: newNote.parentId || null,
         createdAt: newNote.createdAt,
-        updatedAt: newNote.updatedAt,
-        path: null,
-        tags: null,
-        mentions: null
+        updatedAt: newNote.updatedAt
       });
 
       console.log('LiveStore Debug - Committing note created event:', noteCreatedEvent);
@@ -171,19 +166,13 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - New folder object:', newFolder);
 
     try {
-      // Create folder event - need to check if this event exists in schema
-      const folderCreatedEvent = events.noteCreated({
+      // Use the correct folderCreated event with only the fields that exist
+      const folderCreatedEvent = events.folderCreated({
         id: newFolder.id,
-        parentId: newFolder.parentId || null, // Ensure consistent null for undefined
-        clusterId: null,
         title: newFolder.title,
-        content: [], // Empty content for folders
-        type: 'folder',
+        parentId: newFolder.parentId || null,
         createdAt: newFolder.createdAt,
-        updatedAt: newFolder.updatedAt,
-        path: null,
-        tags: null,
-        mentions: null
+        updatedAt: newFolder.updatedAt
       });
 
       console.log('LiveStore Debug - Committing folder created event:', folderCreatedEvent);
@@ -380,20 +369,16 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // FIXED: Proper root item filtering logic
   const getItemsByParent = (parentId?: string): FileSystemItem[] => {
     console.log('LiveStore Debug - Getting items by parent:', parentId);
     console.log('LiveStore Debug - Total items available:', processedItems.length);
     
-    // For root items (parentId is undefined), we want items where parentId is null or undefined
     const filtered = processedItems.filter(item => {
       if (parentId === undefined) {
-        // Root level: include items with null or undefined parentId
         const isRoot = item.parentId === null || item.parentId === undefined;
         console.log('LiveStore Debug - Item', item.id, 'parentId:', item.parentId, 'isRoot:', isRoot);
         return isRoot;
       } else {
-        // Specific parent: exact match
         return item.parentId === parentId;
       }
     });
@@ -408,7 +393,6 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     const note = processedItems.find(item => item.id === noteId && item.type === 'note') as Note;
     if (!note) return null;
 
-    // Parse connections from the note content
     let baseConnections: ParsedConnections;
     try {
       const contentObj = typeof note.content === 'string' ? JSON.parse(note.content) : note.content;
@@ -425,14 +409,12 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    // Find crosslinks - notes that reference this note
     const crosslinks: Array<{ noteId: string; label: string }> = [];
     const allNotes = (processedItems.filter(item => item.type === 'note') as Note[]) || [];
     
     allNotes.forEach(otherNote => {
       if (otherNote.id === noteId) return;
       
-      // Check if this note references the target note by title
       const noteTitle = note.title;
       if (otherNote.content.includes(`<<${noteTitle}>>`)) {
         crosslinks.push({
