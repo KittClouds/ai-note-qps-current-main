@@ -18,16 +18,24 @@ export const entityAttributes$ = queryDb(
   { label: 'entityAttributes$' }
 );
 
-// UI state queries with debugging
+// UI state queries with debugging and proper error handling
 export const uiState$ = computed((get) => {
   const results = get(queryDb(tables.uiState, { label: 'uiStateRaw$' }));
   console.log('LiveStore Query Debug - UI State raw results:', results);
   
-  const state = Array.isArray(results) && results.length > 0 ? results[0].value : {
-    selectedItemId: null,
-    expandedFolders: [],
-    toolbarVisible: true
-  };
+  // Handle both array and direct object results
+  let state;
+  if (Array.isArray(results) && results.length > 0) {
+    state = results[0].value;
+  } else if (results && typeof results === 'object' && 'value' in results) {
+    state = results.value;
+  } else {
+    state = {
+      selectedItemId: null,
+      expandedFolders: [],
+      toolbarVisible: true
+    };
+  }
   
   console.log('LiveStore Query Debug - UI State processed:', state);
   return state;
@@ -42,7 +50,7 @@ export const selectedItemId$ = computed((get) => {
 
 export const expandedFolders$ = computed((get) => {
   const ui = get(uiState$);
-  const expanded = ui?.expandedFolders || [];
+  const expanded = Array.isArray(ui?.expandedFolders) ? ui.expandedFolders : [];
   console.log('LiveStore Query Debug - Expanded Folders:', expanded);
   return expanded;
 }, { label: 'expandedFolders$' });
@@ -52,7 +60,7 @@ export const toolbarVisible$ = computed((get) => {
   return ui?.toolbarVisible ?? true;
 }, { label: 'toolbarVisible$' });
 
-// Combined items query with extensive debugging
+// Combined items query with extensive debugging and proper error handling
 export const allItems$ = computed((get) => {
   const notes = get(notes$);
   const folders = get(folders$);
@@ -60,16 +68,19 @@ export const allItems$ = computed((get) => {
   console.log('LiveStore Query Debug - Raw notes from DB:', notes);
   console.log('LiveStore Query Debug - Raw folders from DB:', folders);
   
-  if (!Array.isArray(notes) || !Array.isArray(folders)) {
-    console.warn('LiveStore Query Debug - Notes or folders not arrays:', { notes, folders });
-    return [];
+  // Ensure we always work with arrays
+  const notesArray = Array.isArray(notes) ? notes : [];
+  const foldersArray = Array.isArray(folders) ? folders : [];
+  
+  if (notesArray.length === 0 && foldersArray.length === 0) {
+    console.log('LiveStore Query Debug - No notes or folders found in database');
   }
   
-  const notesWithType = notes.map(note => ({ ...note, type: 'note' as const }));
-  const foldersWithType = folders.map(folder => ({ ...folder, type: 'folder' as const }));
+  const notesWithType = notesArray.map(note => ({ ...note, type: 'note' as const }));
+  const foldersWithType = foldersArray.map(folder => ({ ...folder, type: 'folder' as const }));
   
   const allItems = [...notesWithType, ...foldersWithType];
-  console.log('LiveStore Query Debug - Combined items:', allItems);
+  console.log('LiveStore Query Debug - Combined items:', allItems.length, 'total items');
   
   return allItems;
 }, { label: 'allItems$' });
@@ -83,11 +94,11 @@ export const selectedItem$ = computed((get) => {
   return allItems.find(item => item.id === selectedId) || null;
 }, { label: 'selectedItem$' });
 
-// Items by parent query
+// Items by parent query - simplified to avoid circular dependencies
 export const createItemsByParentQuery = (parentId?: string) => computed((get) => {
   const allItems = get(allItems$);
   if (!Array.isArray(allItems)) return [];
   const filtered = allItems.filter(item => item.parentId === parentId);
-  console.log('LiveStore Query Debug - Items by parent', parentId, ':', filtered);
+  console.log('LiveStore Query Debug - Items by parent', parentId, ':', filtered.length, 'items');
   return filtered;
 }, { label: `itemsByParent$_${parentId || 'root'}` });
