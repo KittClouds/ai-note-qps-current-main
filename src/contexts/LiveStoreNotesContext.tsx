@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, ReactNode, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useStore, useQuery } from '@livestore/react';
@@ -90,19 +89,14 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - New note object:', newNote);
 
     try {
-      // Create the event payload
+      // Create the event payload with only the properties that exist in the schema
       const noteCreatedEvent = events.noteCreated({
         id: newNote.id,
         title: newNote.title,
-        content: JSON.parse(newNote.content), // Parse content for proper storage
+        content: newNote.content, // Keep as string since schema expects string
         parentId: newNote.parentId || null,
-        clusterId: null,
-        type: 'note',
         createdAt: newNote.createdAt,
-        updatedAt: newNote.updatedAt,
-        path: null,
-        tags: null,
-        mentions: null
+        updatedAt: newNote.updatedAt
       });
 
       console.log('LiveStore Debug - Dispatching note created event:', noteCreatedEvent);
@@ -289,7 +283,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     try {
       const noteUpdatedEvent = events.noteUpdated({ 
         id, 
-        updates: { content: JSON.parse(content) }, 
+        updates: { content }, 
         updatedAt: new Date().toISOString() 
       });
       console.log('LiveStore Debug - Dispatching note content update event:', noteUpdatedEvent);
