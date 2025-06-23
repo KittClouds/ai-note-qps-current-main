@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, ReactNode, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { useStore, useQuery, useDispatch } from '@livestore/react';
+import { useStore, useQuery } from '@livestore/react';
 import { Note, Folder, FileSystemItem, FileTreeState } from '@/types/notes';
 import { parseNoteConnections, ParsedConnections } from '@/utils/parsingUtils';
 import { events } from '@/livestore/schema';
@@ -37,8 +37,8 @@ const NotesContext = createContext<NotesContextType | null>(null);
 const defaultContent = '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Start writing your note..."}]}]}';
 
 export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
-  const store = useStore();
-  const dispatch = useDispatch();
+  const storeContext = useStore();
+  const store = storeContext.store;
   const allItems = useQuery(allItems$);
   const selectedItemId = useQuery(selectedItemId$);
   const expandedFolders = useQuery(expandedFolders$);
@@ -46,7 +46,6 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
   // Add debugging
   console.log('LiveStore Debug - Store:', !!store);
-  console.log('LiveStore Debug - Dispatch:', !!dispatch);
   console.log('LiveStore Debug - All Items:', allItems);
   console.log('LiveStore Debug - Selected ID:', selectedItemId);
   console.log('LiveStore Debug - Expanded Folders:', expandedFolders);
@@ -56,19 +55,13 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     if (store) {
       console.log('LiveStore Debug - Running migration with store');
       try {
-        const migrationStore = {
-          commit: (event: any) => {
-            console.log('LiveStore Debug - Migration dispatching event:', event);
-            return dispatch(event);
-          }
-        };
-        const migrationResult = migrateLegacyData(migrationStore as any);
+        const migrationResult = migrateLegacyData(store);
         console.log('LiveStore Debug - Migration result:', migrationResult);
       } catch (error) {
         console.error('LiveStore Debug - Migration error:', error);
       }
     }
-  }, [store, dispatch]);
+  }, [store]);
 
   // Convert to legacy state format
   const state: FileTreeState = {
@@ -101,14 +94,19 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       const noteCreatedEvent = events.noteCreated({
         id: newNote.id,
         title: newNote.title,
-        content: newNote.content,
+        content: JSON.parse(newNote.content), // Parse content for proper storage
         parentId: newNote.parentId || null,
+        clusterId: null,
+        type: 'note',
         createdAt: newNote.createdAt,
-        updatedAt: newNote.updatedAt
+        updatedAt: newNote.updatedAt,
+        path: null,
+        tags: null,
+        mentions: null
       });
 
       console.log('LiveStore Debug - Dispatching note created event:', noteCreatedEvent);
-      dispatch(noteCreatedEvent);
+      store.commit(noteCreatedEvent);
       
       // Update UI state
       const uiStateEvent = events.uiStateSet({
@@ -118,7 +116,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       });
 
       console.log('LiveStore Debug - Dispatching UI state event:', uiStateEvent);
-      dispatch(uiStateEvent);
+      store.commit(uiStateEvent);
 
       console.log('LiveStore Debug - Note creation completed successfully');
     } catch (error) {
@@ -152,7 +150,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       });
 
       console.log('LiveStore Debug - Dispatching folder created event:', folderCreatedEvent);
-      dispatch(folderCreatedEvent);
+      store.commit(folderCreatedEvent);
       
       // Add to expanded folders
       const newExpanded = [...(expandedFolders || []), newFolder.id];
@@ -163,7 +161,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       });
 
       console.log('LiveStore Debug - Dispatching UI state event for folder:', uiStateEvent);
-      dispatch(uiStateEvent);
+      store.commit(uiStateEvent);
 
       console.log('LiveStore Debug - Folder creation completed successfully');
     } catch (error) {
@@ -191,11 +189,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       if (item.type === 'note') {
         const noteUpdatedEvent = events.noteUpdated({ id, updates, updatedAt: updates.updatedAt });
         console.log('LiveStore Debug - Dispatching note update event:', noteUpdatedEvent);
-        dispatch(noteUpdatedEvent);
+        store.commit(noteUpdatedEvent);
       } else {
         const folderUpdatedEvent = events.folderUpdated({ id, updates, updatedAt: updates.updatedAt });
         console.log('LiveStore Debug - Dispatching folder update event:', folderUpdatedEvent);
-        dispatch(folderUpdatedEvent);
+        store.commit(folderUpdatedEvent);
       }
     } catch (error) {
       console.error('LiveStore Debug - Error renaming item:', error);
@@ -240,11 +238,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
           if (item.type === 'note') {
             const noteDeletedEvent = events.noteDeleted({ id: itemId });
             console.log('LiveStore Debug - Dispatching note delete event:', noteDeletedEvent);
-            dispatch(noteDeletedEvent);
+            store.commit(noteDeletedEvent);
           } else {
             const folderDeletedEvent = events.folderDeleted({ id: itemId });
             console.log('LiveStore Debug - Dispatching folder delete event:', folderDeletedEvent);
-            dispatch(folderDeletedEvent);
+            store.commit(folderDeletedEvent);
           }
           console.log('LiveStore Debug - Deleted item:', itemId);
         }
@@ -259,7 +257,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
           toolbarVisible: true
         });
         console.log('LiveStore Debug - Dispatching UI state event for deletion:', uiStateEvent);
-        dispatch(uiStateEvent);
+        store.commit(uiStateEvent);
       }
     } catch (error) {
       console.error('LiveStore Debug - Error deleting item:', error);
@@ -278,7 +276,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
           toolbarVisible: true
         });
         console.log('LiveStore Debug - Dispatching UI state event for selection:', uiStateEvent);
-        dispatch(uiStateEvent);
+        store.commit(uiStateEvent);
       } catch (error) {
         console.error('LiveStore Debug - Error selecting item:', error);
       }
@@ -291,11 +289,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     try {
       const noteUpdatedEvent = events.noteUpdated({ 
         id, 
-        updates: { content }, 
+        updates: { content: JSON.parse(content) }, 
         updatedAt: new Date().toISOString() 
       });
       console.log('LiveStore Debug - Dispatching note content update event:', noteUpdatedEvent);
-      dispatch(noteUpdatedEvent);
+      store.commit(noteUpdatedEvent);
     } catch (error) {
       console.error('LiveStore Debug - Error updating note content:', error);
     }
@@ -316,7 +314,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         toolbarVisible: true
       });
       console.log('LiveStore Debug - Dispatching UI state event for folder toggle:', uiStateEvent);
-      dispatch(uiStateEvent);
+      store.commit(uiStateEvent);
     } catch (error) {
       console.error('LiveStore Debug - Error toggling folder:', error);
     }
@@ -385,7 +383,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         updatedAt: new Date().toISOString()
       });
       console.log('LiveStore Debug - Dispatching entity attributes update event:', entityAttributesEvent);
-      dispatch(entityAttributesEvent);
+      store.commit(entityAttributesEvent);
     } catch (error) {
       console.error('LiveStore Debug - Error setting entity attributes:', error);
     }
