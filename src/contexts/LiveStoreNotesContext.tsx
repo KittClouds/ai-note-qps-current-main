@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, ReactNode, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { useStore, useQuery, useCommit } from '@livestore/react';
+import { useStore, useQuery } from '@livestore/react';
 import { Note, Folder, FileSystemItem, FileTreeState } from '@/types/notes';
 import { parseNoteConnections, ParsedConnections } from '@/utils/parsingUtils';
 import { events } from '@/livestore/schema';
@@ -38,7 +38,6 @@ const defaultContent = '{"type":"doc","content":[{"type":"paragraph","content":[
 
 export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const store = useStore();
-  const commit = useCommit();
   const allItems = useQuery(allItems$);
   const selectedItemId = useQuery(selectedItemId$);
   const expandedFolders = useQuery(expandedFolders$);
@@ -46,25 +45,23 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
   // Add debugging for store and queries
   console.log('LiveStore Debug - Store:', !!store);
-  console.log('LiveStore Debug - Commit function:', !!commit);
+  console.log('LiveStore Debug - Store object:', store);
   console.log('LiveStore Debug - All Items:', allItems);
   console.log('LiveStore Debug - Selected ID:', selectedItemId);
   console.log('LiveStore Debug - Expanded Folders:', expandedFolders);
 
   // Run migration on first load
   useEffect(() => {
-    if (store && commit) {
-      console.log('LiveStore Debug - Running migration with store and commit');
-      // Create a migration-compatible object
+    if (store) {
+      console.log('LiveStore Debug - Running migration with store');
+      // Create a migration-compatible object with commit function
       const migrationStore = {
-        commit,
-        // Add other properties that migration might need
-        ...store
+        commit: (event: any) => store.commit(event)
       };
       const migrationResult = migrateLegacyData(migrationStore as any);
       console.log('LiveStore Debug - Migration result:', migrationResult);
     }
-  }, [store, commit]);
+  }, [store]);
 
   // Convert to legacy state format
   const state: FileTreeState = {
@@ -105,14 +102,14 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - Event payload:', eventPayload);
 
     try {
-      commit(events.noteCreated(eventPayload));
+      store.commit(events.noteCreated(eventPayload));
       console.log('LiveStore Debug - Note created event committed');
     } catch (error) {
       console.error('LiveStore Debug - Error committing note created event:', error);
     }
     
     try {
-      commit(events.uiStateSet({
+      store.commit(events.uiStateSet({
         selectedItemId: newNote.id,
         expandedFolders: expandedFolders || [],
         toolbarVisible: true
@@ -150,7 +147,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - Folder event payload:', eventPayload);
 
     try {
-      commit(events.folderCreated(eventPayload));
+      store.commit(events.folderCreated(eventPayload));
       console.log('LiveStore Debug - Folder created event committed');
     } catch (error) {
       console.error('LiveStore Debug - Error committing folder created event:', error);
@@ -159,7 +156,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     // Add to expanded folders
     const newExpanded = [...(expandedFolders || []), newFolder.id];
     try {
-      commit(events.uiStateSet({
+      store.commit(events.uiStateSet({
         selectedItemId: selectedItemId || null,
         expandedFolders: newExpanded,
         toolbarVisible: true
@@ -188,9 +185,9 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
     try {
       if (item.type === 'note') {
-        commit(events.noteUpdated({ id, updates, updatedAt: updates.updatedAt }));
+        store.commit(events.noteUpdated({ id, updates, updatedAt: updates.updatedAt }));
       } else {
-        commit(events.folderUpdated({ id, updates, updatedAt: updates.updatedAt }));
+        store.commit(events.folderUpdated({ id, updates, updatedAt: updates.updatedAt }));
       }
       console.log('LiveStore Debug - Item renamed successfully');
     } catch (error) {
@@ -234,9 +231,9 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       if (item) {
         try {
           if (item.type === 'note') {
-            commit(events.noteDeleted({ id: itemId }));
+            store.commit(events.noteDeleted({ id: itemId }));
           } else {
-            commit(events.folderDeleted({ id: itemId }));
+            store.commit(events.folderDeleted({ id: itemId }));
           }
           console.log('LiveStore Debug - Deleted item:', itemId);
         } catch (error) {
@@ -249,7 +246,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     if (toDelete.has(selectedItemId || '')) {
       const newExpanded = (expandedFolders || []).filter(folderId => !toDelete.has(folderId));
       try {
-        commit(events.uiStateSet({
+        store.commit(events.uiStateSet({
           selectedItemId: null,
           expandedFolders: newExpanded,
           toolbarVisible: true
@@ -267,7 +264,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     const item = allItems?.find(item => item.id === id);
     if (item && item.type === 'note') {
       try {
-        commit(events.uiStateSet({
+        store.commit(events.uiStateSet({
           selectedItemId: id,
           expandedFolders: expandedFolders || [],
           toolbarVisible: true
@@ -283,7 +280,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - Updating note content:', id);
     
     try {
-      commit(events.noteUpdated({ 
+      store.commit(events.noteUpdated({ 
         id, 
         updates: { content }, 
         updatedAt: new Date().toISOString() 
@@ -303,7 +300,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       : [...currentExpanded, id];
 
     try {
-      commit(events.uiStateSet({
+      store.commit(events.uiStateSet({
         selectedItemId: selectedItemId || null,
         expandedFolders: newExpanded,
         toolbarVisible: true
@@ -371,7 +368,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
   const setEntityAttributes = (entityKey: string, attributes: Record<string, any>) => {
     try {
-      commit(events.entityAttributesUpdated({
+      store.commit(events.entityAttributesUpdated({
         entityKey,
         attributes,
         updatedAt: new Date().toISOString()
