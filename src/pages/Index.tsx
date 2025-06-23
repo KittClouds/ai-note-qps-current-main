@@ -24,6 +24,7 @@ import { useState, useCallback } from "react";
 import { NotesProvider, useNotes } from "@/contexts/NotesContext";
 import { EntityManagerDrawer } from "@/components/entity-manager/EntityManagerDrawer";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LayoutSizer } from "@/components/ui/layout-sizer";
 
 function NotesApp() {
   const { theme } = useTheme();
@@ -97,7 +98,11 @@ function NotesApp() {
             <div className="flex-1 flex flex-col min-h-0 bg-background">
               {selectedNote ? (
                 <>
-                  <div className="flex-1 min-h-0">
+                  <LayoutSizer 
+                    className="flex-1 min-h-0"
+                    includeConnections={connectionsOpen}
+                    includeToolbar={toolbarVisible}
+                  >
                     <RichEditor
                       content={selectedNote.content}
                       onChange={handleEditorChange}
@@ -106,25 +111,29 @@ function NotesApp() {
                       onToolbarVisibilityChange={handleToolbarVisibilityChange}
                       noteId={selectedNote.id}
                     />
-                  </div>
+                  </LayoutSizer>
                   <ConnectionsPanelContainer 
                     isOpen={connectionsOpen}
                     onToggle={() => setConnectionsOpen(!connectionsOpen)}
                   />
                 </>
               ) : (
-                <div className="flex flex-col items-center justify-center h-full text-muted-foreground bg-background">
-                  <div className="text-center space-y-4">
-                    <div className="text-6xl mb-4">📝</div>
-                    <h2 className="text-2xl font-semibold text-foreground">No note selected</h2>
-                    <p className="text-muted-foreground max-w-md">
-                      Select a note from the sidebar or create a new one to start editing
-                    </p>
-                    <Button className="btn-purple-gradient text-white font-medium px-6 py-2 mt-4">
-                      Create New Note
-                    </Button>
+                <LayoutSizer className="flex flex-col items-center justify-center bg-background">
+                  <div className="text-center space-y-6 max-w-md mx-auto px-6">
+                    <div className="text-8xl mb-6 opacity-60">📝</div>
+                    <div className="space-y-4">
+                      <h2 className="text-3xl font-semibold text-foreground">No note selected</h2>
+                      <p className="text-lg text-muted-foreground leading-relaxed">
+                        Select a note from the sidebar or create a new one to start editing your thoughts and ideas
+                      </p>
+                    </div>
+                    <div className="pt-4">
+                      <Button className="btn-purple-gradient text-white font-medium px-8 py-3 text-lg">
+                        Create New Note
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                </LayoutSizer>
               )}
             </div>
           </SidebarInset>

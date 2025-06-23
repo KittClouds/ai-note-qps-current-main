@@ -72,6 +72,8 @@ import 'katex/dist/katex.min.css';
 import 'easydrawer/styles.css';
 import 'react-image-crop/dist/ReactCrop.css';
 
+import { useLayoutDimensions } from '@/hooks/useLayoutDimensions';
+
 interface RichEditorProps {
   content: string;
   onChange: (content: string) => void;
@@ -254,6 +256,11 @@ const RichEditor = ({
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const previousContentRef = useRef<string>('');
 
+  const dimensions = useLayoutDimensions({ 
+    includeToolbar: toolbarVisible,
+    includeConnections: false // RichEditor doesn't need to account for connections panel
+  });
+
   // Listen for keyboard shortcut (Ctrl+\) - use the localStorage-persisting handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -332,7 +339,7 @@ const RichEditor = ({
         extensions={extensions}
         dark={isDarkMode}
         minHeight="400px"
-        maxHeight={maxHeight}
+        maxHeight={dimensions.availableHeight}
         hideToolbar={!toolbarVisible}
         bubbleMenu={{
           render({ extensionsNames, editor, disabled }, bubbleDefaultDom) {
