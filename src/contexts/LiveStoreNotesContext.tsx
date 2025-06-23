@@ -37,7 +37,7 @@ const NotesContext = createContext<NotesContextType | null>(null);
 const defaultContent = '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Start writing your note..."}]}]}';
 
 export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
-  const store = useStore();
+  const { store } = useStore(); // Fixed: destructure store from the hook result
   const allItems = useQuery(allItems$);
   const selectedItemId = useQuery(selectedItemId$);
   const expandedFolders = useQuery(expandedFolders$);
@@ -67,12 +67,21 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       title: 'Untitled',
       content: defaultContent,
       type: 'note',
-      parentId,
+      parentId: parentId || undefined, // Convert null to undefined for our type
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    store.commit(events.noteCreated(newNote));
+    // Fixed: pass the exact fields that match the schema
+    store.commit(events.noteCreated({
+      id: newNote.id,
+      title: newNote.title,
+      content: newNote.content,
+      parentId: newNote.parentId || null, // Convert undefined to null for the schema
+      createdAt: newNote.createdAt,
+      updatedAt: newNote.updatedAt
+    }));
+    
     store.commit(events.uiStateSet({
       selectedItemId: newNote.id,
       expandedFolders: expandedFolders || [],
@@ -87,12 +96,18 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       id: uuidv4(),
       title: 'Untitled Folder',
       type: 'folder',
-      parentId,
+      parentId: parentId || undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
-    store.commit(events.folderCreated(newFolder));
+    store.commit(events.folderCreated({
+      id: newFolder.id,
+      title: newFolder.title,
+      parentId: newFolder.parentId || null,
+      createdAt: newFolder.createdAt,
+      updatedAt: newFolder.updatedAt
+    }));
     
     // Add to expanded folders
     const newExpanded = [...(expandedFolders || []), newFolder.id];

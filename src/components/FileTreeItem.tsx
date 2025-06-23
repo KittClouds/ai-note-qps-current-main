@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { SidebarMenuButton, SidebarMenuItem, SidebarMenuSub } from '@/components/ui/sidebar';
 import { InlineEditor } from './InlineEditor';
-import { useNotes } from '@/contexts/NotesContext';
+import { useNotes } from '@/contexts/LiveStoreNotesContext'; // Fixed import
 import { FileSystemItem } from '@/types/notes';
 
 interface FileTreeItemProps {

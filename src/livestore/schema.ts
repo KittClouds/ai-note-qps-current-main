@@ -61,7 +61,7 @@ export const tables = {
   })
 };
 
-// Define events for state changes
+// Define events for state changes - fixed to match our types
 export const events = {
   // Note events
   noteCreated: Events.synced({
