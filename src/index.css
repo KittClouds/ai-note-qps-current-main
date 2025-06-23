@@ -166,16 +166,10 @@
 @layer components {
   .editor-themed {
     @apply bg-background;
-    transition: height 0.2s ease-out;
-  }
-
-  .editor-container {
-    transition: height 0.2s ease-out;
   }
 
   .editor-themed .ProseMirror {
     @apply bg-background text-foreground;
-    transition: height 0.2s ease-out;
   }
 
   /* Ensure toolbar matches theme */
