@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, ReactNode, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useStore, useQuery } from '@livestore/react';
@@ -10,8 +9,7 @@ import {
   folders$, 
   allItems$, 
   selectedItemId$, 
-  expandedFolders$, 
-  createItemsByParentQuery,
+  expandedFolders$,
   entityAttributes$
 } from '@/livestore/queries';
 import { migrateLegacyData } from '@/livestore/migration';
@@ -37,18 +35,16 @@ const NotesContext = createContext<NotesContextType | null>(null);
 const defaultContent = '{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"Start writing your note..."}]}]}';
 
 export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
-  // Fix: Properly extract store from the context
-  const storeContext = useStore();
-  const store = storeContext.store;
+  // Fix: Properly access the store from LiveStore context
+  const store = useStore();
   
   const allItems = useQuery(allItems$);
   const selectedItemId = useQuery(selectedItemId$);
   const expandedFolders = useQuery(expandedFolders$);
   const entityAttributesData = useQuery(entityAttributes$);
 
-  // Add debugging
-  console.log('LiveStore Debug - Store:', !!store);
-  console.log('LiveStore Debug - All Items Raw:', allItems);
+  console.log('LiveStore Debug - Store available:', !!store);
+  console.log('LiveStore Debug - All Items:', allItems);
   console.log('LiveStore Debug - Selected ID:', selectedItemId);
   console.log('LiveStore Debug - Expanded Folders:', expandedFolders);
 
@@ -65,15 +61,19 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     }
   }, [store]);
 
-  // Fix: Properly handle query results and convert to legacy state format
+  // Process query results properly
+  const processedItems = Array.isArray(allItems) ? allItems : [];
+  const processedSelectedId = selectedItemId || null;
+  const processedExpandedFolders = Array.isArray(expandedFolders) ? expandedFolders : [];
+
   const state: FileTreeState = {
-    items: Array.isArray(allItems) ? allItems : [],
-    selectedItemId: selectedItemId || null,
-    expandedFolders: new Set(Array.isArray(expandedFolders) ? expandedFolders : [])
+    items: processedItems,
+    selectedItemId: processedSelectedId,
+    expandedFolders: new Set(processedExpandedFolders)
   };
 
-  const selectedNote = selectedItemId && Array.isArray(allItems)
-    ? allItems.find(item => item.id === selectedItemId && item.type === 'note') as Note || null
+  const selectedNote = processedSelectedId && processedItems.length > 0
+    ? processedItems.find(item => item.id === processedSelectedId && item.type === 'note') as Note || null
     : null;
 
   const createNote = (parentId?: string): Note => {
@@ -81,7 +81,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     
     if (!store) {
       console.error('LiveStore Debug - No store available for note creation');
-      return {
+      const fallbackNote: Note = {
         id: uuidv4(),
         title: 'Untitled',
         content: defaultContent,
@@ -90,6 +90,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
+      return fallbackNote;
     }
 
     const newNote: Note = {
@@ -105,7 +106,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - New note object:', newNote);
 
     try {
-      // Create the event payload with only the properties that exist in the schema
+      // Create the event payload
       const noteCreatedEvent = events.noteCreated({
         id: newNote.id,
         title: newNote.title,
@@ -115,18 +116,17 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         updatedAt: newNote.updatedAt
       });
 
-      console.log('LiveStore Debug - Dispatching note created event:', noteCreatedEvent);
+      console.log('LiveStore Debug - Committing note created event:', noteCreatedEvent);
       store.commit(noteCreatedEvent);
       
-      // Update UI state
-      const currentExpanded = Array.isArray(expandedFolders) ? expandedFolders : [];
+      // Update UI state to select the new note
       const uiStateEvent = events.uiStateSet({
         selectedItemId: newNote.id,
-        expandedFolders: currentExpanded,
+        expandedFolders: processedExpandedFolders,
         toolbarVisible: true
       });
 
-      console.log('LiveStore Debug - Dispatching UI state event:', uiStateEvent);
+      console.log('LiveStore Debug - Committing UI state event:', uiStateEvent);
       store.commit(uiStateEvent);
 
       console.log('LiveStore Debug - Note creation completed successfully');
@@ -142,7 +142,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     
     if (!store) {
       console.error('LiveStore Debug - No store available for folder creation');
-      return {
+      const fallbackFolder: Folder = {
         id: uuidv4(),
         title: 'Untitled Folder',
         type: 'folder',
@@ -150,6 +150,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
+      return fallbackFolder;
     }
 
     const newFolder: Folder = {
@@ -172,19 +173,18 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         updatedAt: newFolder.updatedAt
       });
 
-      console.log('LiveStore Debug - Dispatching folder created event:', folderCreatedEvent);
+      console.log('LiveStore Debug - Committing folder created event:', folderCreatedEvent);
       store.commit(folderCreatedEvent);
       
-      // Add to expanded folders
-      const currentExpanded = Array.isArray(expandedFolders) ? expandedFolders : [];
-      const newExpanded = [...currentExpanded, newFolder.id];
+      // Add to expanded folders and keep selection
+      const newExpanded = [...processedExpandedFolders, newFolder.id];
       const uiStateEvent = events.uiStateSet({
-        selectedItemId: selectedItemId || null,
+        selectedItemId: processedSelectedId,
         expandedFolders: newExpanded,
         toolbarVisible: true
       });
 
-      console.log('LiveStore Debug - Dispatching UI state event for folder:', uiStateEvent);
+      console.log('LiveStore Debug - Committing UI state event for folder:', uiStateEvent);
       store.commit(uiStateEvent);
 
       console.log('LiveStore Debug - Folder creation completed successfully');
@@ -203,8 +203,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const items = Array.isArray(allItems) ? allItems : [];
-    const item = items.find(item => item.id === id);
+    const item = processedItems.find(item => item.id === id);
     if (!item) {
       console.warn('LiveStore Debug - Item not found for rename:', id);
       return;
@@ -218,11 +217,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
       if (item.type === 'note') {
         const noteUpdatedEvent = events.noteUpdated({ id, updates, updatedAt: updates.updatedAt });
-        console.log('LiveStore Debug - Dispatching note update event:', noteUpdatedEvent);
+        console.log('LiveStore Debug - Committing note update event:', noteUpdatedEvent);
         store.commit(noteUpdatedEvent);
       } else {
         const folderUpdatedEvent = events.folderUpdated({ id, updates, updatedAt: updates.updatedAt });
-        console.log('LiveStore Debug - Dispatching folder update event:', folderUpdatedEvent);
+        console.log('LiveStore Debug - Committing folder update event:', folderUpdatedEvent);
         store.commit(folderUpdatedEvent);
       }
     } catch (error) {
@@ -238,8 +237,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const items = Array.isArray(allItems) ? allItems : [];
-    if (items.length === 0) {
+    if (processedItems.length === 0) {
       console.warn('LiveStore Debug - No items available for deletion');
       return;
     }
@@ -254,7 +252,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         
         visited.add(parentId);
         
-        const children = items.filter(item => item.parentId === parentId);
+        const children = processedItems.filter(item => item.parentId === parentId);
         const descendants = children.map(child => child.id);
         
         children.forEach(child => {
@@ -269,31 +267,29 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       
       // Delete all items
       toDelete.forEach(itemId => {
-        const item = items.find(item => item.id === itemId);
+        const item = processedItems.find(item => item.id === itemId);
         if (item) {
           if (item.type === 'note') {
             const noteDeletedEvent = events.noteDeleted({ id: itemId });
-            console.log('LiveStore Debug - Dispatching note delete event:', noteDeletedEvent);
+            console.log('LiveStore Debug - Committing note delete event:', noteDeletedEvent);
             store.commit(noteDeletedEvent);
           } else {
             const folderDeletedEvent = events.folderDeleted({ id: itemId });
-            console.log('LiveStore Debug - Dispatching folder delete event:', folderDeletedEvent);
+            console.log('LiveStore Debug - Committing folder delete event:', folderDeletedEvent);
             store.commit(folderDeletedEvent);
           }
-          console.log('LiveStore Debug - Deleted item:', itemId);
         }
       });
 
       // Update UI state if selected item was deleted
-      if (toDelete.has(selectedItemId || '')) {
-        const currentExpanded = Array.isArray(expandedFolders) ? expandedFolders : [];
-        const newExpanded = currentExpanded.filter(folderId => !toDelete.has(folderId));
+      if (toDelete.has(processedSelectedId || '')) {
+        const newExpanded = processedExpandedFolders.filter(folderId => !toDelete.has(folderId));
         const uiStateEvent = events.uiStateSet({
           selectedItemId: null,
           expandedFolders: newExpanded,
           toolbarVisible: true
         });
-        console.log('LiveStore Debug - Dispatching UI state event for deletion:', uiStateEvent);
+        console.log('LiveStore Debug - Committing UI state event for deletion:', uiStateEvent);
         store.commit(uiStateEvent);
       }
     } catch (error) {
@@ -309,17 +305,15 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const items = Array.isArray(allItems) ? allItems : [];
-    const item = items.find(item => item.id === id);
+    const item = processedItems.find(item => item.id === id);
     if (item && item.type === 'note') {
       try {
-        const currentExpanded = Array.isArray(expandedFolders) ? expandedFolders : [];
         const uiStateEvent = events.uiStateSet({
           selectedItemId: id,
-          expandedFolders: currentExpanded,
+          expandedFolders: processedExpandedFolders,
           toolbarVisible: true
         });
-        console.log('LiveStore Debug - Dispatching UI state event for selection:', uiStateEvent);
+        console.log('LiveStore Debug - Committing UI state event for selection:', uiStateEvent);
         store.commit(uiStateEvent);
       } catch (error) {
         console.error('LiveStore Debug - Error selecting item:', error);
@@ -341,7 +335,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         updates: { content }, 
         updatedAt: new Date().toISOString() 
       });
-      console.log('LiveStore Debug - Dispatching note content update event:', noteUpdatedEvent);
+      console.log('LiveStore Debug - Committing note content update event:', noteUpdatedEvent);
       store.commit(noteUpdatedEvent);
     } catch (error) {
       console.error('LiveStore Debug - Error updating note content:', error);
@@ -357,34 +351,30 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     }
 
     try {
-      const currentExpanded = Array.isArray(expandedFolders) ? expandedFolders : [];
-      const newExpanded = currentExpanded.includes(id)
-        ? currentExpanded.filter(folderId => folderId !== id)
-        : [...currentExpanded, id];
+      const newExpanded = processedExpandedFolders.includes(id)
+        ? processedExpandedFolders.filter(folderId => folderId !== id)
+        : [...processedExpandedFolders, id];
 
       const uiStateEvent = events.uiStateSet({
-        selectedItemId: selectedItemId || null,
+        selectedItemId: processedSelectedId,
         expandedFolders: newExpanded,
         toolbarVisible: true
       });
-      console.log('LiveStore Debug - Dispatching UI state event for folder toggle:', uiStateEvent);
+      console.log('LiveStore Debug - Committing UI state event for folder toggle:', uiStateEvent);
       store.commit(uiStateEvent);
     } catch (error) {
       console.error('LiveStore Debug - Error toggling folder:', error);
     }
   };
 
-  // Fix: Properly handle query results and filter by parent
   const getItemsByParent = (parentId?: string): FileSystemItem[] => {
-    const items = Array.isArray(allItems) ? allItems : [];
-    const filtered = items.filter(item => item.parentId === parentId);
-    console.log('LiveStore Debug - Items by parent', parentId, ':', filtered, 'from total:', items.length);
+    const filtered = processedItems.filter(item => item.parentId === parentId);
+    console.log('LiveStore Debug - Items by parent', parentId, ':', filtered.length, 'from total:', processedItems.length);
     return filtered;
   };
 
   const getConnectionsForNote = (noteId: string): (ParsedConnections & { crosslinks: Array<{ noteId: string; label: string }> }) | null => {
-    const items = Array.isArray(allItems) ? allItems : [];
-    const note = items.find(item => item.id === noteId && item.type === 'note') as Note;
+    const note = processedItems.find(item => item.id === noteId && item.type === 'note') as Note;
     if (!note) return null;
 
     // Parse connections from the note content
@@ -406,7 +396,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
     // Find crosslinks - notes that reference this note
     const crosslinks: Array<{ noteId: string; label: string }> = [];
-    const allNotes = (items.filter(item => item.type === 'note') as Note[]) || [];
+    const allNotes = (processedItems.filter(item => item.type === 'note') as Note[]) || [];
     
     allNotes.forEach(otherNote => {
       if (otherNote.id === noteId) return;
@@ -445,7 +435,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         attributes,
         updatedAt: new Date().toISOString()
       });
-      console.log('LiveStore Debug - Dispatching entity attributes update event:', entityAttributesEvent);
+      console.log('LiveStore Debug - Committing entity attributes update event:', entityAttributesEvent);
       store.commit(entityAttributesEvent);
     } catch (error) {
       console.error('LiveStore Debug - Error setting entity attributes:', error);
