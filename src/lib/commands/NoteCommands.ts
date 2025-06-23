@@ -1,5 +1,5 @@
 
-import { BaseCommand } from './Command';
+import { BaseCommand, Command } from './Command';
 import { events } from '@/livestore/schema';
 
 export class CreateNoteCommand extends BaseCommand {
@@ -21,7 +21,14 @@ export class CreateNoteCommand extends BaseCommand {
 
   execute(): void {
     if (!this.executed) {
-      this.store.commit(events.noteCreated(this.noteData));
+      this.store.commit(events.noteCreated({
+        id: this.noteData.id,
+        title: this.noteData.title,
+        content: this.noteData.content,
+        parentId: this.noteData.parentId || null,
+        createdAt: this.noteData.createdAt,
+        updatedAt: this.noteData.updatedAt
+      }));
       this.executed = true;
     }
   }
