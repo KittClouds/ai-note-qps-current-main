@@ -6,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { LiveStoreNotesProvider } from "@/contexts/LiveStoreNotesContext";
+import { CommandHistoryProvider } from "@/contexts/CommandHistoryContext";
+import { BulkSelectionProvider } from "@/contexts/BulkSelectionContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -18,13 +20,17 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <LiveStoreNotesProvider>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </LiveStoreNotesProvider>
+          <CommandHistoryProvider>
+            <LiveStoreNotesProvider>
+              <BulkSelectionProvider>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BulkSelectionProvider>
+            </LiveStoreNotesProvider>
+          </CommandHistoryProvider>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>

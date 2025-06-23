@@ -14,6 +14,7 @@ import {
 } from '@/livestore/queries';
 import { migrateLegacyData } from '@/livestore/migration';
 import { useToast } from '@/hooks/use-toast';
+import { useCommandHistory } from '@/contexts/CommandHistoryContext';
 
 interface NotesContextType {
   state: FileTreeState;
@@ -40,6 +41,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const storeWrapper = useStore();
   const actualStore = storeWrapper?.store;
   const { toast } = useToast();
+  const { executeCommand, createNoteCommand, updateNoteContentCommand, deleteNoteCommand } = useCommandHistory();
   
   const allItems = useQuery(allItems$);
   const selectedItemId = useQuery(selectedItemId$);
@@ -115,18 +117,17 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     console.log('LiveStore Debug - New note object:', newNote);
 
     try {
-      // Create the event payload with only the fields that exist in the schema
-      const noteCreatedEvent = events.noteCreated({
+      // Use command pattern for undo/redo support
+      const command = createNoteCommand({
         id: newNote.id,
         title: newNote.title,
-        content: newNote.content, // Keep as string
+        content: newNote.content,
         parentId: newNote.parentId || null,
         createdAt: newNote.createdAt,
         updatedAt: newNote.updatedAt
       });
 
-      console.log('LiveStore Debug - Committing note created event:', noteCreatedEvent);
-      actualStore.commit(noteCreatedEvent);
+      executeCommand(command);
       
       // Update UI state to select the new note
       const uiStateEvent = events.uiStateSet({
@@ -156,6 +157,123 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     }
 
     return newNote;
+  };
+
+  const updateNoteContent = (id: string, content: string) => {
+    console.log('LiveStore Debug - Updating note content:', id);
+    
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for content update');
+      return;
+    }
+
+    try {
+      // Get the current note for old content
+      const currentNote = processedItems.find(item => item.id === id && item.type === 'note') as Note;
+      if (!currentNote) {
+        console.error('LiveStore Debug - Note not found for content update:', id);
+        return;
+      }
+
+      // Use command pattern for undo/redo support
+      const command = updateNoteContentCommand(id, content, currentNote.content);
+      executeCommand(command);
+
+      console.log('LiveStore Debug - Note content update completed successfully');
+    } catch (error) {
+      console.error('LiveStore Debug - Error updating note content:', error);
+    }
+  };
+
+  const deleteItem = (id: string) => {
+    console.log('LiveStore Debug - Deleting item:', id);
+    
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for deletion');
+      return;
+    }
+
+    if (processedItems.length === 0) {
+      console.warn('LiveStore Debug - No items available for deletion');
+      return;
+    }
+
+    try {
+      const item = processedItems.find(item => item.id === id);
+      if (!item) {
+        console.warn('LiveStore Debug - Item not found for deletion:', id);
+        return;
+      }
+
+      // Use command pattern for undo/redo support (notes only for now)
+      if (item.type === 'note') {
+        const command = deleteNoteCommand(id, {
+          id: item.id,
+          title: item.title,
+          content: item.content,
+          parentId: item.parentId || null,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt
+        });
+        executeCommand(command);
+      } else {
+        // For folders, use direct deletion (can be enhanced later)
+        const folderDeletedEvent = events.folderDeleted({ id });
+        console.log('LiveStore Debug - Committing folder delete event:', folderDeletedEvent);
+        actualStore.commit(folderDeletedEvent);
+      }
+
+      // Get all descendant IDs to delete
+      const getDescendants = (parentId: string, visited: Set<string> = new Set()): string[] => {
+        if (visited.has(parentId)) {
+          console.warn(`LiveStore Debug - Circular reference detected for item ${parentId}`);
+          return [];
+        }
+        
+        visited.add(parentId);
+        
+        const children = processedItems.filter(item => item.parentId === parentId);
+        const descendants = children.map(child => child.id);
+        
+        children.forEach(child => {
+          descendants.push(...getDescendants(child.id, new Set(visited)));
+        });
+        
+        return descendants;
+      };
+
+      const toDelete = new Set([id, ...getDescendants(id)]);
+      console.log('LiveStore Debug - Items to delete:', Array.from(toDelete));
+      
+      // Delete all items
+      toDelete.forEach(itemId => {
+        const item = processedItems.find(item => item.id === itemId);
+        if (item) {
+          if (item.type === 'note') {
+            const noteDeletedEvent = events.noteDeleted({ id: itemId });
+            console.log('LiveStore Debug - Committing note delete event:', noteDeletedEvent);
+            actualStore.commit(noteDeletedEvent);
+          } else {
+            const folderDeletedEvent = events.folderDeleted({ id: itemId });
+            console.log('LiveStore Debug - Committing folder delete event:', folderDeletedEvent);
+            actualStore.commit(folderDeletedEvent);
+          }
+        }
+      });
+
+      // Update UI state if selected item was deleted
+      if (id === processedSelectedId) {
+        const uiStateEvent = events.uiStateSet({
+          selectedItemId: null,
+          expandedFolders: processedExpandedFolders.filter(folderId => folderId !== id),
+          toolbarVisible: true
+        });
+        console.log('LiveStore Debug - Committing UI state event for deletion:', uiStateEvent);
+        actualStore.commit(uiStateEvent);
+      }
+    } catch (error) {
+      console.error('LiveStore Debug - Error deleting item:', error);
+    }
   };
 
   const createFolder = (parentId?: string): Folder => {
@@ -268,74 +386,6 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const deleteItem = (id: string) => {
-    console.log('LiveStore Debug - Deleting item:', id);
-    
-    if (!actualStore) {
-      console.error('LiveStore Debug - No actual store available for deletion');
-      return;
-    }
-
-    if (processedItems.length === 0) {
-      console.warn('LiveStore Debug - No items available for deletion');
-      return;
-    }
-
-    try {
-      // Get all descendant IDs to delete
-      const getDescendants = (parentId: string, visited: Set<string> = new Set()): string[] => {
-        if (visited.has(parentId)) {
-          console.warn(`LiveStore Debug - Circular reference detected for item ${parentId}`);
-          return [];
-        }
-        
-        visited.add(parentId);
-        
-        const children = processedItems.filter(item => item.parentId === parentId);
-        const descendants = children.map(child => child.id);
-        
-        children.forEach(child => {
-          descendants.push(...getDescendants(child.id, new Set(visited)));
-        });
-        
-        return descendants;
-      };
-
-      const toDelete = new Set([id, ...getDescendants(id)]);
-      console.log('LiveStore Debug - Items to delete:', Array.from(toDelete));
-      
-      // Delete all items
-      toDelete.forEach(itemId => {
-        const item = processedItems.find(item => item.id === itemId);
-        if (item) {
-          if (item.type === 'note') {
-            const noteDeletedEvent = events.noteDeleted({ id: itemId });
-            console.log('LiveStore Debug - Committing note delete event:', noteDeletedEvent);
-            actualStore.commit(noteDeletedEvent);
-          } else {
-            const folderDeletedEvent = events.folderDeleted({ id: itemId });
-            console.log('LiveStore Debug - Committing folder delete event:', folderDeletedEvent);
-            actualStore.commit(folderDeletedEvent);
-          }
-        }
-      });
-
-      // Update UI state if selected item was deleted
-      if (toDelete.has(processedSelectedId || '')) {
-        const newExpanded = processedExpandedFolders.filter(folderId => !toDelete.has(folderId));
-        const uiStateEvent = events.uiStateSet({
-          selectedItemId: null,
-          expandedFolders: newExpanded,
-          toolbarVisible: true
-        });
-        console.log('LiveStore Debug - Committing UI state event for deletion:', uiStateEvent);
-        actualStore.commit(uiStateEvent);
-      }
-    } catch (error) {
-      console.error('LiveStore Debug - Error deleting item:', error);
-    }
-  };
-
   const bulkDeleteItems = async (ids: string[]): Promise<void> => {
     console.log('LiveStore Debug - Bulk deleting items:', ids);
     
@@ -445,27 +495,6 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         console.error('LiveStore Debug - Error selecting item:', error);
       }
-    }
-  };
-
-  const updateNoteContent = (id: string, content: string) => {
-    console.log('LiveStore Debug - Updating note content:', id);
-    
-    if (!actualStore) {
-      console.error('LiveStore Debug - No actual store available for content update');
-      return;
-    }
-
-    try {
-      const noteUpdatedEvent = events.noteUpdated({ 
-        id, 
-        updates: { content }, 
-        updatedAt: new Date().toISOString() 
-      });
-      console.log('LiveStore Debug - Committing note content update event:', noteUpdatedEvent);
-      actualStore.commit(noteUpdatedEvent);
-    } catch (error) {
-      console.error('LiveStore Debug - Error updating note content:', error);
     }
   };
 

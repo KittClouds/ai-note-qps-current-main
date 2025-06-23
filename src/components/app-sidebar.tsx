@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { FileTreeItem } from "./FileTreeItem"
 import { BulkActionsToolbar } from "./BulkActionsToolbar"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
+import { UndoRedoToolbar } from "./UndoRedoToolbar"
 import { useNotes } from "@/contexts/LiveStoreNotesContext"
 import { useBulkSelection } from "@/contexts/BulkSelectionContext"
 import { useState } from "react"
@@ -84,6 +85,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             )}
           </div>
         </div>
+        <UndoRedoToolbar />
       </SidebarHeader>
       <SidebarContent>
         {isSelectionMode && (
