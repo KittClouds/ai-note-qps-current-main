@@ -36,30 +36,32 @@ const defaultContent = '{"type":"doc","content":[{"type":"paragraph","content":[
 
 export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   // Fix: Properly access the store from LiveStore context
-  const store = useStore();
+  const storeWrapper = useStore();
+  const actualStore = storeWrapper?.store;
   
   const allItems = useQuery(allItems$);
   const selectedItemId = useQuery(selectedItemId$);
   const expandedFolders = useQuery(expandedFolders$);
   const entityAttributesData = useQuery(entityAttributes$);
 
-  console.log('LiveStore Debug - Store available:', !!store);
+  console.log('LiveStore Debug - Store wrapper available:', !!storeWrapper);
+  console.log('LiveStore Debug - Actual store available:', !!actualStore);
   console.log('LiveStore Debug - All Items:', allItems);
   console.log('LiveStore Debug - Selected ID:', selectedItemId);
   console.log('LiveStore Debug - Expanded Folders:', expandedFolders);
 
   // Run migration on first load
   useEffect(() => {
-    if (store) {
-      console.log('LiveStore Debug - Running migration with store');
+    if (actualStore) {
+      console.log('LiveStore Debug - Running migration with actual store');
       try {
-        const migrationResult = migrateLegacyData(store);
+        const migrationResult = migrateLegacyData(actualStore);
         console.log('LiveStore Debug - Migration result:', migrationResult);
       } catch (error) {
         console.error('LiveStore Debug - Migration error:', error);
       }
     }
-  }, [store]);
+  }, [actualStore]);
 
   // Process query results properly
   const processedItems = Array.isArray(allItems) ? allItems : [];
@@ -79,8 +81,8 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const createNote = (parentId?: string): Note => {
     console.log('LiveStore Debug - Creating note with parentId:', parentId);
     
-    if (!store) {
-      console.error('LiveStore Debug - No store available for note creation');
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for note creation');
       const fallbackNote: Note = {
         id: uuidv4(),
         title: 'Untitled',
@@ -117,7 +119,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       });
 
       console.log('LiveStore Debug - Committing note created event:', noteCreatedEvent);
-      store.commit(noteCreatedEvent);
+      actualStore.commit(noteCreatedEvent);
       
       // Update UI state to select the new note
       const uiStateEvent = events.uiStateSet({
@@ -127,7 +129,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       });
 
       console.log('LiveStore Debug - Committing UI state event:', uiStateEvent);
-      store.commit(uiStateEvent);
+      actualStore.commit(uiStateEvent);
 
       console.log('LiveStore Debug - Note creation completed successfully');
     } catch (error) {
@@ -140,8 +142,8 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const createFolder = (parentId?: string): Folder => {
     console.log('LiveStore Debug - Creating folder with parentId:', parentId);
     
-    if (!store) {
-      console.error('LiveStore Debug - No store available for folder creation');
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for folder creation');
       const fallbackFolder: Folder = {
         id: uuidv4(),
         title: 'Untitled Folder',
@@ -174,7 +176,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       });
 
       console.log('LiveStore Debug - Committing folder created event:', folderCreatedEvent);
-      store.commit(folderCreatedEvent);
+      actualStore.commit(folderCreatedEvent);
       
       // Add to expanded folders and keep selection
       const newExpanded = [...processedExpandedFolders, newFolder.id];
@@ -185,7 +187,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       });
 
       console.log('LiveStore Debug - Committing UI state event for folder:', uiStateEvent);
-      store.commit(uiStateEvent);
+      actualStore.commit(uiStateEvent);
 
       console.log('LiveStore Debug - Folder creation completed successfully');
     } catch (error) {
@@ -198,8 +200,8 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const renameItem = (id: string, newTitle: string) => {
     console.log('LiveStore Debug - Renaming item:', id, 'to:', newTitle);
     
-    if (!store) {
-      console.error('LiveStore Debug - No store available for rename');
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for rename');
       return;
     }
 
@@ -218,11 +220,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       if (item.type === 'note') {
         const noteUpdatedEvent = events.noteUpdated({ id, updates, updatedAt: updates.updatedAt });
         console.log('LiveStore Debug - Committing note update event:', noteUpdatedEvent);
-        store.commit(noteUpdatedEvent);
+        actualStore.commit(noteUpdatedEvent);
       } else {
         const folderUpdatedEvent = events.folderUpdated({ id, updates, updatedAt: updates.updatedAt });
         console.log('LiveStore Debug - Committing folder update event:', folderUpdatedEvent);
-        store.commit(folderUpdatedEvent);
+        actualStore.commit(folderUpdatedEvent);
       }
     } catch (error) {
       console.error('LiveStore Debug - Error renaming item:', error);
@@ -232,8 +234,8 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const deleteItem = (id: string) => {
     console.log('LiveStore Debug - Deleting item:', id);
     
-    if (!store) {
-      console.error('LiveStore Debug - No store available for deletion');
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for deletion');
       return;
     }
 
@@ -272,11 +274,11 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
           if (item.type === 'note') {
             const noteDeletedEvent = events.noteDeleted({ id: itemId });
             console.log('LiveStore Debug - Committing note delete event:', noteDeletedEvent);
-            store.commit(noteDeletedEvent);
+            actualStore.commit(noteDeletedEvent);
           } else {
             const folderDeletedEvent = events.folderDeleted({ id: itemId });
             console.log('LiveStore Debug - Committing folder delete event:', folderDeletedEvent);
-            store.commit(folderDeletedEvent);
+            actualStore.commit(folderDeletedEvent);
           }
         }
       });
@@ -290,7 +292,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
           toolbarVisible: true
         });
         console.log('LiveStore Debug - Committing UI state event for deletion:', uiStateEvent);
-        store.commit(uiStateEvent);
+        actualStore.commit(uiStateEvent);
       }
     } catch (error) {
       console.error('LiveStore Debug - Error deleting item:', error);
@@ -300,8 +302,8 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const selectItem = (id: string) => {
     console.log('LiveStore Debug - Selecting item:', id);
     
-    if (!store) {
-      console.error('LiveStore Debug - No store available for selection');
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for selection');
       return;
     }
 
@@ -314,7 +316,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
           toolbarVisible: true
         });
         console.log('LiveStore Debug - Committing UI state event for selection:', uiStateEvent);
-        store.commit(uiStateEvent);
+        actualStore.commit(uiStateEvent);
       } catch (error) {
         console.error('LiveStore Debug - Error selecting item:', error);
       }
@@ -324,8 +326,8 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const updateNoteContent = (id: string, content: string) => {
     console.log('LiveStore Debug - Updating note content:', id);
     
-    if (!store) {
-      console.error('LiveStore Debug - No store available for content update');
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for content update');
       return;
     }
 
@@ -336,7 +338,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         updatedAt: new Date().toISOString() 
       });
       console.log('LiveStore Debug - Committing note content update event:', noteUpdatedEvent);
-      store.commit(noteUpdatedEvent);
+      actualStore.commit(noteUpdatedEvent);
     } catch (error) {
       console.error('LiveStore Debug - Error updating note content:', error);
     }
@@ -345,8 +347,8 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const toggleFolder = (id: string) => {
     console.log('LiveStore Debug - Toggling folder:', id);
     
-    if (!store) {
-      console.error('LiveStore Debug - No store available for folder toggle');
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for folder toggle');
       return;
     }
 
@@ -361,7 +363,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         toolbarVisible: true
       });
       console.log('LiveStore Debug - Committing UI state event for folder toggle:', uiStateEvent);
-      store.commit(uiStateEvent);
+      actualStore.commit(uiStateEvent);
     } catch (error) {
       console.error('LiveStore Debug - Error toggling folder:', error);
     }
@@ -424,8 +426,8 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   };
 
   const setEntityAttributes = (entityKey: string, attributes: Record<string, any>) => {
-    if (!store) {
-      console.error('LiveStore Debug - No store available for entity attributes');
+    if (!actualStore) {
+      console.error('LiveStore Debug - No actual store available for entity attributes');
       return;
     }
 
@@ -436,7 +438,7 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         updatedAt: new Date().toISOString()
       });
       console.log('LiveStore Debug - Committing entity attributes update event:', entityAttributesEvent);
-      store.commit(entityAttributesEvent);
+      actualStore.commit(entityAttributesEvent);
     } catch (error) {
       console.error('LiveStore Debug - Error setting entity attributes:', error);
     }
