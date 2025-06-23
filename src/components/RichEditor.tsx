@@ -1,3 +1,4 @@
+
 import { useCallback, useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import RichTextEditor, { BaseKit } from 'reactjs-tiptap-editor';
 import {
@@ -274,17 +275,37 @@ const RichEditor = ({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [toolbarVisible, onToolbarVisibilityChange]);
 
-  // Force layout recalculation when toolbar visibility changes
+  // Enhanced force layout recalculation when toolbar visibility changes
   useLayoutEffect(() => {
     if (editorInstance) {
       // Force a reflow by requesting animation frame
       requestAnimationFrame(() => {
-        // Trigger editor resize
-        if (editorInstance.view) {
-          editorInstance.view.dom.style.height = maxHeight;
+        // Force both width and height recalculation
+        if (editorInstance.view && editorInstance.view.dom) {
+          const editorDom = editorInstance.view.dom;
+          // Force height update
+          editorDom.style.height = maxHeight;
+          // Force width to full available space
+          editorDom.style.width = '100%';
+          editorDom.style.maxWidth = '100%';
+          
+          // Also update parent container
+          const container = editorDom.closest('.editor-container');
+          if (container) {
+            container.style.width = '100%';
+          }
         }
-        // Dispatch resize event to ensure all components recalculate
-        window.dispatchEvent(new Event('resize'));
+        
+        // Use multiple resize triggers with slight delay
+        setTimeout(() => {
+          // Dispatch resize event to ensure all components recalculate
+          window.dispatchEvent(new Event('resize'));
+          
+          // Try to trigger editor's internal resize if available
+          if (editorInstance.commands && editorInstance.commands.focus) {
+            editorInstance.commands.focus();
+          }
+        }, 10);
       });
     }
   }, [toolbarVisible, editorInstance, maxHeight]);
@@ -336,7 +357,7 @@ const RichEditor = ({
   }, [content]);
 
   return (
-    <div className="h-full flex flex-col min-h-0 editor-themed theme-aware-editor editor-container">
+    <div className="h-full w-full flex flex-col min-h-0 editor-themed theme-aware-editor editor-container">
       <RichTextEditor
         output="json"
         content={editorContent as any}

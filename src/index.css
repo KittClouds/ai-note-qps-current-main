@@ -162,34 +162,51 @@
   }
 }
 
-/* Enhanced editor styling for unified theme */
+/* Enhanced editor styling for unified theme with width fixes */
 @layer components {
   .editor-themed {
-    @apply bg-background;
-    transition: height 0.2s ease-out;
+    @apply bg-background w-full;
+    transition: height 0.2s ease-out, width 0.2s ease-out;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   .editor-container {
-    transition: height 0.2s ease-out;
+    transition: height 0.2s ease-out, width 0.2s ease-out;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   .editor-themed .ProseMirror {
-    @apply bg-background text-foreground;
-    transition: height 0.2s ease-out;
+    @apply bg-background text-foreground w-full;
+    transition: height 0.2s ease-out, width 0.2s ease-out;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Force full width for all editor elements */
+  .editor-themed .RichTextEditor,
+  .editor-themed .RichTextEditor > div,
+  .editor-themed .tiptap-editor,
+  .editor-themed .tiptap-editor > div {
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   /* Ensure toolbar matches theme */
   .editor-themed .toolbar {
-    @apply bg-background border-border;
+    @apply bg-background border-border w-full;
+    width: 100% !important;
+    max-width: 100% !important;
   }
 
   /* Theme-aware components */
   .theme-aware-editor .ͼc {
-    @apply bg-background;
+    @apply bg-background w-full;
   }
 
   .theme-aware-editor .cm-editor {
-    @apply bg-background;
+    @apply bg-background w-full;
   }
 }
 
