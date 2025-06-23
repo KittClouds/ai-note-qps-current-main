@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
 import RichTextEditor, { BaseKit } from 'reactjs-tiptap-editor';
 import {
   BubbleMenuTwitter,
@@ -254,6 +254,11 @@ const RichEditor = ({
   const [editorInstance, setEditorInstance] = useState<any>(null);
   const previousContentRef = useRef<string>('');
 
+  // Memoize height calculation to ensure it updates when dependencies change
+  const maxHeight = useMemo(() => {
+    return toolbarVisible ? "calc(100vh - 200px)" : "calc(100vh - 140px)";
+  }, [toolbarVisible]);
+
   // Listen for keyboard shortcut (Ctrl+\) - use the localStorage-persisting handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -268,6 +273,21 @@ const RichEditor = ({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [toolbarVisible, onToolbarVisibilityChange]);
+
+  // Force layout recalculation when toolbar visibility changes
+  useLayoutEffect(() => {
+    if (editorInstance) {
+      // Force a reflow by requesting animation frame
+      requestAnimationFrame(() => {
+        // Trigger editor resize
+        if (editorInstance.view) {
+          editorInstance.view.dom.style.height = maxHeight;
+        }
+        // Dispatch resize event to ensure all components recalculate
+        window.dispatchEvent(new Event('resize'));
+      });
+    }
+  }, [toolbarVisible, editorInstance, maxHeight]);
 
   // Force editor content update when content prop changes (note switching)
   useEffect(() => {
@@ -315,11 +335,8 @@ const RichEditor = ({
     previousContentRef.current = initialContent;
   }, [content]);
 
-  // Calculate dynamic maxHeight based on toolbar visibility
-  const maxHeight = toolbarVisible ? "calc(100vh - 200px)" : "calc(100vh - 140px)";
-
   return (
-    <div className="h-full flex flex-col min-h-0 editor-themed theme-aware-editor">
+    <div className="h-full flex flex-col min-h-0 editor-themed theme-aware-editor editor-container">
       <RichTextEditor
         output="json"
         content={editorContent as any}

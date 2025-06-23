@@ -1,3 +1,4 @@
+
 import { AppSidebar } from "@/components/app-sidebar"
 import RightSidebar from "@/components/RightSidebar"
 import { RightSidebarProvider, RightSidebarTrigger } from "@/components/RightSidebarProvider"
@@ -99,6 +100,7 @@ function NotesApp() {
                 <>
                   <div className="flex-1 min-h-0">
                     <RichEditor
+                      key={selectedNote.id}
                       content={selectedNote.content}
                       onChange={handleEditorChange}
                       isDarkMode={theme === 'dark'}
