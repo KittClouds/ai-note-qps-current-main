@@ -15,7 +15,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { FileTreeItem } from "./FileTreeItem"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
-import { useNotes } from "@/contexts/NotesContext"
+import { useNotes } from "@/contexts/LiveStoreNotesContext"
 import { useState } from "react"
 import { Note } from "@/types/notes"
 

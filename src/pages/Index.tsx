@@ -1,3 +1,4 @@
+
 import { AppSidebar } from "@/components/app-sidebar";
 import RightSidebar from "@/components/RightSidebar";
 import { RightSidebarProvider, RightSidebarTrigger } from "@/components/RightSidebarProvider";
@@ -10,14 +11,13 @@ import RichEditor from "@/components/RichEditor";
 import { ConnectionsPanelContainer } from "@/components/ConnectionsPanelContainer";
 import { useTheme } from "next-themes";
 import { useState, useCallback } from "react";
-import { NotesProvider, useNotes } from "@/contexts/NotesContext";
+import { useNotes } from "@/contexts/LiveStoreNotesContext";
 import { EntityManagerDrawer } from "@/components/entity-manager/EntityManagerDrawer";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LayoutSizer } from "@/components/ui/layout-sizer";
+
 function NotesApp() {
-  const {
-    theme
-  } = useTheme();
+  const { theme } = useTheme();
 
   // State with localStorage persistence
   const [toolbarVisible, setToolbarVisible] = useState(() => {
@@ -25,25 +25,26 @@ function NotesApp() {
     return saved !== null ? JSON.parse(saved) : true;
   });
   const [connectionsOpen, setConnectionsOpen] = useState(true);
-  const {
-    selectedNote,
-    updateNoteContent
-  } = useNotes();
+  const { selectedNote, updateNoteContent } = useNotes();
 
   // Toggle handlers with localStorage persistence
   const handleToggleToolbar = useCallback(() => {
     setToolbarVisible(v => !v);
   }, []);
+  
   const handleToolbarVisibilityChange = useCallback((visible: boolean) => {
     setToolbarVisible(visible);
     localStorage.setItem('editor-toolbar-visible', JSON.stringify(visible));
   }, []);
+  
   const handleEditorChange = (content: string) => {
     if (selectedNote) {
       updateNoteContent(selectedNote.id, content);
     }
   };
-  return <SidebarProvider>
+
+  return (
+    <SidebarProvider>
       <RightSidebarProvider>
         <div className="min-h-screen flex w-full bg-background">
           <AppSidebar />
@@ -75,12 +76,15 @@ function NotesApp() {
             </header>
             
             <LayoutSizer className="flex-1 flex flex-col min-h-0" includeConnections={connectionsOpen} includeToolbar={toolbarVisible}>
-              {selectedNote ? <>
+              {selectedNote ? (
+                <>
                   <div className="flex-1 min-h-0">
                     <RichEditor content={selectedNote.content} onChange={handleEditorChange} isDarkMode={theme === 'dark'} toolbarVisible={toolbarVisible} onToolbarVisibilityChange={handleToolbarVisibilityChange} noteId={selectedNote.id} />
                   </div>
                   <ConnectionsPanelContainer isOpen={connectionsOpen} onToggle={() => setConnectionsOpen(!connectionsOpen)} />
-                </> : <div className="flex flex-col items-center justify-center bg-background h-full">
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center bg-background h-full">
                   <div className="text-center space-y-6 max-w-md mx-auto px-6">
                     <div className="text-8xl mb-6 opacity-60">📝</div>
                     <div className="space-y-4">
@@ -95,17 +99,19 @@ function NotesApp() {
                       </Button>
                     </div>
                   </div>
-                </div>}
+                </div>
+              )}
             </LayoutSizer>
           </SidebarInset>
           <RightSidebar />
         </div>
       </RightSidebarProvider>
-    </SidebarProvider>;
+    </SidebarProvider>
+  );
 }
+
 const Index = () => {
-  return <NotesProvider>
-      <NotesApp />
-    </NotesProvider>;
+  return <NotesApp />;
 };
+
 export default Index;

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useNotes } from '@/contexts/NotesContext';
+import { useNotes } from '@/contexts/LiveStoreNotesContext';
 import { EntityAttributePanel } from './EntityAttributePanel';
 import { parseNoteConnections } from '@/utils/parsingUtils';
 
