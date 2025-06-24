@@ -15,8 +15,6 @@ import {
 import { migrateLegacyData } from '@/livestore/migration';
 import { useToast } from '@/hooks/use-toast';
 import { useCommandHistory } from '@/contexts/CommandHistoryContext';
-import { syncManager } from '@/lib/sync/SyncManager';
-import { DeltaCompressor } from '@/lib/sync/DeltaCompression';
 
 interface NotesContextType {
   state: FileTreeState;
@@ -176,13 +174,6 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
         console.error('LiveStore Debug - Note not found for content update:', id);
         return;
       }
-
-      // Create delta operation for merge-vacuum system
-      const deltas = DeltaCompressor.compress(currentNote.content, content);
-      const deltaOperation = DeltaCompressor.createOperation(id, deltas);
-      
-      // Record the write operation with sync manager
-      syncManager.recordWrite(deltaOperation);
 
       // Use command pattern for undo/redo support
       const command = updateNoteContentCommand(id, content, currentNote.content);
@@ -493,9 +484,6 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
     const item = processedItems.find(item => item.id === id);
     if (item && item.type === 'note') {
-      // Record read activity
-      syncManager.recordRead(id);
-      
       try {
         const uiStateEvent = events.uiStateSet({
           selectedItemId: id,
