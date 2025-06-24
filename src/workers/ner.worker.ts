@@ -1,13 +1,13 @@
 
-import { pipeline, Pipeline } from '@huggingface/transformers';
+import { pipeline } from '@huggingface/transformers';
 import { NERWorkerMessage, NERWorkerResponse, NERSpan } from '../lib/ner/types';
 
 class MyNERPipeline {
-  static task = 'token-classification';
+  static task = 'token-classification' as const;
   static model = 'onnx-community/gliner_small-v2.1';
   static instance: MyNERPipeline | null = null;
 
-  private pipeline: Pipeline | null = null;
+  private pipeline: any = null;
   private isLoading = false;
 
   static async getInstance(progress_callback?: (progress: any) => void): Promise<MyNERPipeline> {
