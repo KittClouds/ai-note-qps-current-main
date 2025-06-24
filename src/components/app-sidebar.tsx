@@ -1,126 +1,92 @@
-
-import * as React from "react"
-import { Plus, FolderPlus, CheckSquare } from "lucide-react"
-
+import React from "react"
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarMenu,
-  SidebarRail,
+  SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Icons } from "./icons"
 import { Button } from "@/components/ui/button"
-import { FileTreeItem } from "./FileTreeItem"
-import { BulkActionsToolbar } from "./BulkActionsToolbar"
-import { EnhancedSearchBar } from "./EnhancedSearchBar"
-import { UndoRedoToolbar } from "./UndoRedoToolbar"
-import { useNotes } from "@/contexts/LiveStoreNotesContext"
-import { useBulkSelection } from "@/contexts/BulkSelectionContext"
-import { useState } from "react"
-import { Note } from "@/types/notes"
+import { useTheme } from "next-themes"
+import { Separator } from "@/components/ui/separator"
+import { MergeVacuumStatus } from './MergeVacuumStatus';
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { createNote, createFolder, getItemsByParent, state, selectItem } = useNotes();
-  const { isSelectionMode, enterSelectionMode, hasSelection } = useBulkSelection();
-  const [searchQuery, setSearchQuery] = useState("");
-  const rootItems = getItemsByParent(); // Items without a parent
-
-  // Get all notes from the state for search functionality
-  const allNotes = state.items.filter(item => item.type === 'note') as Note[];
-
-  // Filter items based on search query for text search
-  const filteredItems = searchQuery.trim() 
-    ? rootItems.filter(item => 
-        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.type === 'note' && item.content.toLowerCase().includes(searchQuery.toLowerCase()))
-      )
-    : rootItems;
-
-  const handleNoteSelect = (noteId: string) => {
-    selectItem(noteId);
-    setSearchQuery(""); // Clear search when selecting a note
-  };
-
-  const allItemIds = state.items.map(item => item.id);
+  const { setTheme } = useTheme()
 
   return (
-    <Sidebar {...props}>
-      <SidebarHeader className="border-b">
-        <div className="flex items-center justify-between p-2">
-          <h2 className="text-lg font-semibold">Notes</h2>
-          <div className="flex gap-1">
-            {!isSelectionMode && (
-              <>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="h-8 w-8 p-0"
-                  onClick={() => createNote()}
-                  title="New Note"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="h-8 w-8 p-0"
-                  onClick={() => createFolder()}
-                  title="New Folder"
-                >
-                  <FolderPlus className="h-4 w-4" />
-                </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="h-8 w-8 p-0"
-                  onClick={enterSelectionMode}
-                  title="Bulk Select"
-                >
-                  <CheckSquare className="h-4 w-4" />
-                </Button>
-              </>
-            )}
+    <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader>
+        <div className="space-y-2">
+          <div className="flex items-center space-x-2">
+            <Avatar>
+              <AvatarImage src="https://github.com/shadcn.png" alt="@shadcn" />
+              <AvatarFallback>SC</AvatarFallback>
+            </Avatar>
+            <h4 className="font-semibold">
+              shadcn
+            </h4>
           </div>
+          <p className="text-xs text-muted-foreground">
+            shadcn@example.com
+          </p>
         </div>
-        <UndoRedoToolbar />
       </SidebarHeader>
       <SidebarContent>
-        {isSelectionMode && (
-          <BulkActionsToolbar allItemIds={allItemIds} />
-        )}
-        
-        {!isSelectionMode && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Search</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <EnhancedSearchBar
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                notes={allNotes}
-                onNoteSelect={handleNoteSelect}
-                className="px-2"
-              />
-            </SidebarGroupContent>
-          </SidebarGroup>
-        )}
-        
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {isSelectionMode ? 'Select Items' : 'All Notes'}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {filteredItems.map((item) => (
-                <FileTreeItem key={item.id} item={item} />
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <div className="space-y-4 py-4">
+          <div className="px-3 py-2 text-sm">
+            <h4 className="mb-1 font-medium">
+              Dashboards
+            </h4>
+            <ul className="mt-2 space-y-1">
+              <li>
+                <Button variant="ghost" className="justify-start">
+                  <Icons.home className="mr-2 h-4 w-4" />
+                  <span>
+                    Home
+                  </span>
+                </Button>
+              </li>
+              <li>
+                <Button variant="ghost" className="justify-start">
+                  <Icons.settings className="mr-2 h-4 w-4" />
+                  <span>
+                    Settings
+                  </span>
+                </Button>
+              </li>
+              <li>
+                <Button variant="ghost" className="justify-start">
+                  <Icons.analytics className="mr-2 h-4 w-4" />
+                  <span>
+                    Analytics
+                  </span>
+                </Button>
+              </li>
+            </ul>
+          </div>
+        </div>
       </SidebarContent>
-      <SidebarRail />
+      <SidebarFooter>
+        <div className="p-2 space-y-2">
+          <MergeVacuumStatus />
+          <Separator />
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="theme"
+              onClick={() => {
+                setTheme(theme => (theme === "dark" ? "light" : "dark"))
+              }}
+            />
+            <Label htmlFor="theme">
+              Dark Mode
+            </Label>
+          </div>
+        </div>
+      </SidebarFooter>
     </Sidebar>
   )
 }
