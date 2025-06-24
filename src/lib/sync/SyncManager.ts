@@ -25,9 +25,9 @@ export class SyncManager {
     });
 
     // Connect sync queue to merge-vacuum for delta operations
-    this.syncQueue.subscribe((operation) => {
-      if (operation.type === 'delta') {
-        this.mergeVacuum.addDeltaOperation(operation.data as DeltaOperation);
+    this.syncQueue.subscribe((item) => {
+      if (item.type === 'delta') {
+        this.mergeVacuum.addDeltaOperation(item.data as DeltaOperation);
       }
     });
 

@@ -3,7 +3,8 @@ import { DeltaOperation } from './DeltaCompression';
 
 export interface SyncQueueItem {
   id: string;
-  operation: DeltaOperation;
+  type: 'delta' | 'merge' | 'compact';
+  data: DeltaOperation | any;
   priority: 'high' | 'normal' | 'low';
   retries: number;
   timestamp: number;
@@ -12,12 +13,37 @@ export interface SyncQueueItem {
 export class SyncQueue {
   private queue: SyncQueueItem[] = [];
   private processing = false;
-  private listeners: Array<(state: { pending: number; processing: boolean }) => void> = [];
+  private listeners: Array<(item: SyncQueueItem) => void> = [];
+  private statusListeners: Array<(state: { pending: number; processing: boolean }) => void> = [];
+
+  enqueue(item: Omit<SyncQueueItem, 'priority' | 'retries'>): void {
+    const queueItem: SyncQueueItem = {
+      ...item,
+      priority: 'normal',
+      retries: 0
+    };
+
+    // Insert based on priority
+    const priorityOrder = { high: 0, normal: 1, low: 2 };
+    let insertIndex = this.queue.findIndex(
+      existing => priorityOrder[existing.priority] > priorityOrder[queueItem.priority]
+    );
+    
+    if (insertIndex === -1) {
+      this.queue.push(queueItem);
+    } else {
+      this.queue.splice(insertIndex, 0, queueItem);
+    }
+
+    this.notifyStatusListeners();
+    this.processQueue();
+  }
 
   add(operation: DeltaOperation, priority: 'high' | 'normal' | 'low' = 'normal'): void {
     const item: SyncQueueItem = {
       id: crypto.randomUUID(),
-      operation,
+      type: 'delta',
+      data: operation,
       priority,
       retries: 0,
       timestamp: Date.now()
@@ -35,7 +61,7 @@ export class SyncQueue {
       this.queue.splice(insertIndex, 0, item);
     }
 
-    this.notifyListeners();
+    this.notifyStatusListeners();
     this.processQueue();
   }
 
@@ -43,13 +69,14 @@ export class SyncQueue {
     if (this.processing || this.queue.length === 0) return;
 
     this.processing = true;
-    this.notifyListeners();
+    this.notifyStatusListeners();
 
     while (this.queue.length > 0) {
       const item = this.queue.shift()!;
       
       try {
         await this.processSyncItem(item);
+        this.notifyListeners(item);
       } catch (error) {
         console.error('Sync error:', error);
         
@@ -63,14 +90,14 @@ export class SyncQueue {
     }
 
     this.processing = false;
-    this.notifyListeners();
+    this.notifyStatusListeners();
   }
 
   private async processSyncItem(item: SyncQueueItem): Promise<void> {
     // Simulate sync processing - replace with actual sync logic
     return new Promise((resolve) => {
       setTimeout(() => {
-        console.log('Synced operation:', item.operation);
+        console.log('Synced operation:', item);
         resolve();
       }, 100);
     });
@@ -83,20 +110,31 @@ export class SyncQueue {
     };
   }
 
-  subscribe(listener: (state: { pending: number; processing: boolean }) => void): () => void {
+  subscribe(listener: (item: SyncQueueItem) => void): () => void {
     this.listeners.push(listener);
     return () => {
       this.listeners = this.listeners.filter(l => l !== listener);
     };
   }
 
-  private notifyListeners(): void {
+  subscribeStatus(listener: (state: { pending: number; processing: boolean }) => void): () => void {
+    this.statusListeners.push(listener);
+    return () => {
+      this.statusListeners = this.statusListeners.filter(l => l !== listener);
+    };
+  }
+
+  private notifyListeners(item: SyncQueueItem): void {
+    this.listeners.forEach(listener => listener(item));
+  }
+
+  private notifyStatusListeners(): void {
     const status = this.getStatus();
-    this.listeners.forEach(listener => listener(status));
+    this.statusListeners.forEach(listener => listener(status));
   }
 
   clear(): void {
     this.queue = [];
-    this.notifyListeners();
+    this.notifyStatusListeners();
   }
 }

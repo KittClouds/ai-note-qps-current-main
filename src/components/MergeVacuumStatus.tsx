@@ -20,7 +20,7 @@ export function MergeVacuumStatus() {
     return `${Math.floor(ms / 1000)}s`;
   };
 
-  const getStatusColor = (): string => {
+  const getStatusColor = (): "default" | "destructive" | "secondary" | "outline" => {
     if (lastError) return 'destructive';
     if (isRunning) return 'default';
     if (deltaLogSize > 1024 * 1024) return 'secondary'; // > 1MB
