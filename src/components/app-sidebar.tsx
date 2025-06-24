@@ -16,13 +16,14 @@ import { FileTreeItem } from "./FileTreeItem"
 import { BulkActionsToolbar } from "./BulkActionsToolbar"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
 import { UndoRedoToolbar } from "./UndoRedoToolbar"
+import { SystemStatusModal } from "./SystemStatusModal"
 import { useNotes } from "@/contexts/LiveStoreNotesContext"
 import { useBulkSelection } from "@/contexts/BulkSelectionContext"
 import { useState } from "react"
 import { Note } from "@/types/notes"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { createNote, createFolder, getItemsByParent, state, selectItem } = useNotes();
+  const { createNote, createFolder, getItemsByParent, state, selectItem, getSystemStatus } = useNotes();
   const { isSelectionMode, enterSelectionMode, hasSelection } = useBulkSelection();
   const [searchQuery, setSearchQuery] = useState("");
   const rootItems = getItemsByParent(); // Items without a parent
