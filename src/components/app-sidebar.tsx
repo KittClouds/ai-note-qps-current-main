@@ -1,6 +1,5 @@
-
 import * as React from "react"
-import { Plus, FolderPlus, CheckSquare } from "lucide-react"
+import { Plus, FolderPlus, CheckSquare, Settings } from "lucide-react"
 
 import {
   Sidebar,
@@ -27,6 +26,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { isSelectionMode, enterSelectionMode, hasSelection } = useBulkSelection();
   const [searchQuery, setSearchQuery] = useState("");
   const rootItems = getItemsByParent(); // Items without a parent
+  const [showSystemStatus, setShowSystemStatus] = useState(false);
 
   // Get all notes from the state for search functionality
   const allNotes = state.items.filter(item => item.type === 'note') as Note[];
@@ -81,6 +81,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 >
                   <CheckSquare className="h-4 w-4" />
                 </Button>
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="h-8 w-8 p-0"
+                  onClick={() => setShowSystemStatus(true)}
+                  title="System Status"
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
               </>
             )}
           </div>
@@ -121,6 +130,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarGroup>
       </SidebarContent>
       <SidebarRail />
+      <SystemStatusModal
+        open={showSystemStatus}
+        onOpenChange={setShowSystemStatus}
+        mergeVacuumStats={getSystemStatus().mergeVacuum}
+      />
     </Sidebar>
   )
 }

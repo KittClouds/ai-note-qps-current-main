@@ -15,6 +15,7 @@ import {
 import { migrateLegacyData } from '@/livestore/migration';
 import { useToast } from '@/hooks/use-toast';
 import { useCommandHistory } from '@/contexts/CommandHistoryContext';
+import { useMergeVacuum } from '@/hooks/useMergeVacuum';
 
 interface NotesContextType {
   state: FileTreeState;
@@ -31,6 +32,9 @@ interface NotesContextType {
   getConnectionsForNote: (noteId: string) => (ParsedConnections & { crosslinks: Array<{ noteId: string; label: string }> }) | null;
   getEntityAttributes: (entityKey: string) => Record<string, any>;
   setEntityAttributes: (entityKey: string, attributes: Record<string, any>) => void;
+  getSystemStatus: () => {
+    mergeVacuum: any;
+  };
 }
 
 const NotesContext = createContext<NotesContextType | null>(null);
@@ -53,6 +57,9 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   console.log('LiveStore Debug - All Items:', allItems);
   console.log('LiveStore Debug - Selected ID:', selectedItemId);
   console.log('LiveStore Debug - Expanded Folders:', expandedFolders);
+
+  // Add merge-vacuum service
+  const { stats: mergeVacuumStats, recordActivity, updateLogSize } = useMergeVacuum();
 
   // Run migration on first load
   useEffect(() => {
@@ -84,6 +91,9 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
 
   const createNote = (parentId?: string): Note => {
     console.log('LiveStore Debug - Creating note with parentId:', parentId);
+    
+    // Record activity for merge-vacuum
+    recordActivity();
     
     if (!actualStore) {
       console.error('LiveStore Debug - No actual store available for note creation');
@@ -162,6 +172,9 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
   const updateNoteContent = (id: string, content: string) => {
     console.log('LiveStore Debug - Updating note content:', id);
     
+    // Record activity for merge-vacuum
+    recordActivity();
+    
     if (!actualStore) {
       console.error('LiveStore Debug - No actual store available for content update');
       return;
@@ -178,6 +191,10 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       // Use command pattern for undo/redo support
       const command = updateNoteContentCommand(id, content, currentNote.content);
       executeCommand(command);
+
+      // Update log size estimation (rough approximation)
+      const contentSize = new Blob([content]).size;
+      updateLogSize(contentSize);
 
       console.log('LiveStore Debug - Note content update completed successfully');
     } catch (error) {
@@ -609,6 +626,12 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const getSystemStatus = () => {
+    return {
+      mergeVacuum: mergeVacuumStats
+    };
+  };
+
   return (
     <NotesContext.Provider value={{
       state,
@@ -624,7 +647,8 @@ export function LiveStoreNotesProvider({ children }: { children: ReactNode }) {
       getItemsByParent,
       getConnectionsForNote,
       getEntityAttributes,
-      setEntityAttributes
+      setEntityAttributes,
+      getSystemStatus
     }}>
       {children}
     </NotesContext.Provider>
