@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { ChevronDown, ChevronRight, Link, Hash, AtSign, Database, GitBranch, Brain } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { ChevronDown, ChevronRight, Link, Hash, AtSign, Database, GitBranch, Brain, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ParsedConnections } from '@/utils/parsingUtils';
 import { nerService, NEREntity } from '@/lib/ner/nerService';
 import { extractTextFromNoteContent } from '@/lib/ner/textProcessing';
+import { useToast } from '@/hooks/use-toast';
 
 interface ConnectionsPanelProps {
   connections: (ParsedConnections & { crosslinks?: Array<{ noteId: string; label: string }> }) | null;
@@ -20,6 +21,8 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const [nerEntitiesExpanded, setNerEntitiesExpanded] = useState(true);
   const [isRunningNER, setIsRunningNER] = useState(false);
   const [nerEntities, setNerEntities] = useState<NEREntity[]>([]);
+  const [nerStatus, setNerStatus] = useState<string>('');
+  const { toast } = useToast();
 
   const entityCount = connections?.entities.length || 0;
   const tripleCount = connections?.triples.length || 0;
@@ -27,29 +30,108 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const crosslinkCount = connections?.crosslinks?.length || 0;
   const nerEntityCount = nerEntities.length;
 
-  const handleRunNER = async () => {
+  const handleRunNER = useCallback(async () => {
     if (!selectedNote || isRunningNER) return;
     
+    console.log('[ConnectionsPanel] Starting NER analysis for note:', selectedNote.title);
     setIsRunningNER(true);
+    setNerStatus('Extracting text from note...');
+    
     try {
       // Extract plain text from the selected note's content
       const plainText = extractTextFromNoteContent(selectedNote.content);
       
+      console.log('[ConnectionsPanel] Extracted text length:', plainText?.length || 0);
+      
       if (!plainText.trim()) {
-        console.warn('No text content found in the selected note');
+        console.warn('[ConnectionsPanel] No text content found');
+        setNerStatus('No text content found in note');
+        toast({
+          title: "No Text Found",
+          description: "The selected note doesn't contain any text to analyze.",
+          variant: "destructive"
+        });
         setNerEntities([]);
         return;
       }
       
+      // Check if text is too short
+      if (plainText.trim().length < 10) {
+        setNerStatus('Text too short for meaningful analysis');
+        toast({
+          title: "Text Too Short",
+          description: "The note needs more text content for NER analysis.",
+          variant: "destructive"
+        });
+        setNerEntities([]);
+        return;
+      }
+      
+      setNerStatus('Initializing NER service...');
+      
+      // Get current service status
+      const serviceStatus = nerService.getStatus();
+      console.log('[ConnectionsPanel] NER service status:', serviceStatus);
+      
+      if (serviceStatus.hasError) {
+        setNerStatus(`Service error: ${serviceStatus.errorMessage}`);
+        toast({
+          title: "NER Service Error",
+          description: serviceStatus.errorMessage || "Unknown error occurred",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      setNerStatus('Running NER analysis...');
       const result = await nerService.extractEntities(plainText);
+      
+      console.log('[ConnectionsPanel] NER result:', result);
+      
       setNerEntities(result.entities);
+      setNerStatus('');
+      
+      // Show success toast with results
+      toast({
+        title: "NER Analysis Complete",
+        description: `Found ${result.totalCount} entities in ${result.processingTime}ms`,
+      });
+      
     } catch (error) {
-      console.error('Error running NER analysis:', error);
+      console.error('[ConnectionsPanel] Error during NER analysis:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setNerStatus(`Error: ${errorMessage}`);
       setNerEntities([]);
+      
+      toast({
+        title: "NER Analysis Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
     } finally {
       setIsRunningNER(false);
     }
-  };
+  }, [selectedNote, isRunningNER, toast]);
+
+  const handleReinitializeNER = useCallback(async () => {
+    setNerStatus('Reinitializing NER service...');
+    try {
+      await nerService.reinitialize();
+      setNerStatus('');
+      toast({
+        title: "NER Service Reinitialized",
+        description: "The service has been reset and is ready to use.",
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to reinitialize';
+      setNerStatus(`Reinitialization failed: ${errorMessage}`);
+      toast({
+        title: "Reinitialization Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    }
+  }, [toast]);
 
   const groupedNerEntities = nerEntities.reduce((acc, entity) => {
     if (!acc[entity.type]) {
@@ -58,6 +140,8 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
     acc[entity.type].push(entity);
     return acc;
   }, {} as Record<string, NEREntity[]>);
+
+  const serviceStatus = nerService.getStatus();
 
   return (
     <div className="border-t bg-background">
@@ -112,15 +196,63 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-medium">Named Entity Recognition</h3>
-                    <Button 
-                      onClick={handleRunNER}
-                      disabled={isRunningNER || nerService.isLoading() || !selectedNote}
-                      size="sm"
-                      variant="outline"
-                    >
-                      {isRunningNER ? 'Running...' : 'Run NER Analysis'}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      {serviceStatus.hasError && (
+                        <Button 
+                          onClick={handleReinitializeNER}
+                          size="sm"
+                          variant="outline"
+                          className="text-xs"
+                        >
+                          <RefreshCw className="h-3 w-3 mr-1" />
+                          Reset
+                        </Button>
+                      )}
+                      <Button 
+                        onClick={handleRunNER}
+                        disabled={isRunningNER || !selectedNote}
+                        size="sm"
+                        variant="outline"
+                      >
+                        {isRunningNER ? 'Running...' : 'Run Analysis'}
+                      </Button>
+                    </div>
                   </div>
+                  
+                  {/* Service Status Display */}
+                  {(serviceStatus.hasError || nerStatus || serviceStatus.isLoading) && (
+                    <div className={`p-3 rounded-md text-sm ${
+                      serviceStatus.hasError ? 'bg-destructive/10 text-destructive' :
+                      serviceStatus.isLoading || isRunningNER ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300' :
+                      'bg-muted'
+                    }`}>
+                      {serviceStatus.hasError && (
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-4 w-4" />
+                          <span>Error: {serviceStatus.errorMessage}</span>
+                        </div>
+                      )}
+                      {nerStatus && (
+                        <div className="flex items-center gap-2">
+                          <Brain className="h-4 w-4" />
+                          <span>{nerStatus}</span>
+                        </div>
+                      )}
+                      {serviceStatus.isLoading && !nerStatus && (
+                        <div className="flex items-center gap-2">
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          <span>Loading NER service...</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Service Info */}
+                  {serviceStatus.isInitialized && serviceStatus.modelId && (
+                    <div className="text-xs text-muted-foreground">
+                      Model: {serviceStatus.modelId}
+                    </div>
+                  )}
                   
                   {!selectedNote && (
                     <div className="text-center py-4 text-muted-foreground">
@@ -129,18 +261,11 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                     </div>
                   )}
                   
-                  {selectedNote && nerService.isLoading() && (
-                    <div className="text-center py-4 text-muted-foreground">
-                      <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">NER service is initializing...</p>
-                    </div>
-                  )}
-                  
-                  {selectedNote && !nerService.isLoading() && nerEntityCount === 0 && (
+                  {selectedNote && nerEntityCount === 0 && !isRunningNER && !nerStatus && (
                     <div className="text-center py-8 text-muted-foreground">
                       <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">No named entities detected</p>
-                      <p className="text-xs">Click "Run NER Analysis" to analyze the current note</p>
+                      <p className="text-xs">Click "Run Analysis" to analyze the current note</p>
                     </div>
                   )}
                   
@@ -174,11 +299,18 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                               </div>
                               <div className="space-y-1 ml-4">
                                 {entities.map((entity, index) => (
-                                  <div key={index} className="flex items-center gap-2 p-2 rounded-md hover:bg-muted/50">
-                                    <span className="text-sm font-medium">{entity.value}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      {entity.start}-{entity.end}
-                                    </span>
+                                  <div key={index} className="flex items-center justify-between p-2 rounded-md hover:bg-muted/50">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium">{entity.value}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {entity.start}-{entity.end}
+                                      </span>
+                                    </div>
+                                    {entity.confidence && (
+                                      <span className="text-xs text-muted-foreground">
+                                        {(entity.confidence * 100).toFixed(1)}%
+                                      </span>
+                                    )}
                                   </div>
                                 ))}
                               </div>
