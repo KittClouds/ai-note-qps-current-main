@@ -63,7 +63,6 @@ import { Entity } from '@/extensions/Entity';
 import { Triple } from '@/extensions/Triple';
 import { NoteSyntax } from '@/extensions/NoteSyntax';
 import { Connections } from '@/extensions/Connections';
-import { NERHighlight } from '@/extensions/NERHighlight';
 
 // Import CSS
 import 'reactjs-tiptap-editor/style.css';
@@ -113,9 +112,6 @@ const extensions = [
   WikiLink,
   Entity,
   Triple,
-  
-  // Add NER highlighting extension
-  NERHighlight,
   
   // Add input rules extension
   NoteSyntax,
