@@ -34,6 +34,7 @@ const MODEL_OPTIONS = [
 ];
 
 type CandidateLabels = string[];
+type DeviceType = 'webgpu' | 'wasm' | 'cpu';
 
 // Default entity labels for GLiNER
 const DEFAULT_LABELS: CandidateLabels = [
@@ -64,7 +65,7 @@ class NERService {
     console.log('[NER] Service initialized');
   }
 
-  private async tryInitializeModel(modelId: string, deviceOptions: string[]): Promise<boolean> {
+  private async tryInitializeModel(modelId: string, deviceOptions: DeviceType[]): Promise<boolean> {
     for (const device of deviceOptions) {
       try {
         console.log(`[NER] Attempting to load model ${modelId} on device: ${device}`);
@@ -101,7 +102,7 @@ class NERService {
       env.backends.onnx.wasm.numThreads = Math.min(navigator.hardwareConcurrency ?? 4, 4);
       
       // Device preference order: webgpu -> wasm -> cpu
-      const deviceOptions = ['webgpu', 'wasm', 'cpu'];
+      const deviceOptions: DeviceType[] = ['webgpu', 'wasm', 'cpu'];
       
       // Try each model until one works
       let modelLoaded = false;
