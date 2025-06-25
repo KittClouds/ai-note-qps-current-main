@@ -3,8 +3,9 @@ import { ChevronDown, ChevronRight, Link, Hash, AtSign, Database, GitBranch, Bra
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ParsedConnections } from '@/utils/parsingUtils';
-import { nerService, NEREntity } from '@/lib/ner/nerService';
+import { nerService, NEREntity, AVAILABLE_MODELS, ModelInfo } from '@/lib/ner/nerService';
 import { extractTextFromNoteContent } from '@/lib/ner/textProcessing';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,6 +23,8 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const [isRunningNER, setIsRunningNER] = useState(false);
   const [nerEntities, setNerEntities] = useState<NEREntity[]>([]);
   const [nerStatus, setNerStatus] = useState<string>('');
+  const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
+  const [isModelSwitching, setIsModelSwitching] = useState(false);
   const { toast } = useToast();
 
   const entityCount = connections?.entities.length || 0;
@@ -29,6 +32,47 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const linkCount = connections?.links.length || 0;
   const crosslinkCount = connections?.crosslinks?.length || 0;
   const nerEntityCount = nerEntities.length;
+
+  // Initialize current model on component mount
+  React.useEffect(() => {
+    const serviceStatus = nerService.getStatus();
+    if (serviceStatus.isInitialized) {
+      setCurrentModel(nerService.getCurrentModel());
+    }
+  }, []);
+
+  const handleModelChange = useCallback(async (modelId: string) => {
+    console.log('[ConnectionsPanel] Switching to model:', modelId);
+    setIsModelSwitching(true);
+    setNerStatus('Switching model...');
+    
+    try {
+      await nerService.switchModel(modelId);
+      const newModel = nerService.getCurrentModel();
+      setCurrentModel(newModel);
+      setNerStatus('');
+      
+      // Clear previous results when switching models
+      setNerEntities([]);
+      
+      toast({
+        title: "Model Switched",
+        description: `Now using ${newModel?.name || modelId}`,
+      });
+    } catch (error) {
+      console.error('[ConnectionsPanel] Error switching model:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to switch model';
+      setNerStatus(`Model switch failed: ${errorMessage}`);
+      
+      toast({
+        title: "Model Switch Failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+    } finally {
+      setIsModelSwitching(false);
+    }
+  }, [toast]);
 
   const handleRunNER = useCallback(async () => {
     if (!selectedNote || isRunningNER) return;
@@ -91,6 +135,9 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
       setNerEntities(result.entities);
       setNerStatus('');
       
+      // Update current model info
+      setCurrentModel(nerService.getCurrentModel());
+      
       // Show success toast with results
       toast({
         title: "NER Analysis Complete",
@@ -117,6 +164,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
     setNerStatus('Reinitializing NER service...');
     try {
       await nerService.reinitialize();
+      setCurrentModel(nerService.getCurrentModel());
       setNerStatus('');
       toast({
         title: "NER Service Reinitialized",
@@ -210,7 +258,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                       )}
                       <Button 
                         onClick={handleRunNER}
-                        disabled={isRunningNER || !selectedNote}
+                        disabled={isRunningNER || !selectedNote || isModelSwitching}
                         size="sm"
                         variant="outline"
                       >
@@ -219,11 +267,38 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                     </div>
                   </div>
                   
+                  {/* Model Selector */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Model:</span>
+                    <Select 
+                      value={currentModel?.id || AVAILABLE_MODELS[0].id} 
+                      onValueChange={handleModelChange}
+                      disabled={isModelSwitching || isRunningNER}
+                    >
+                      <SelectTrigger className="w-auto min-w-[200px] h-8 text-xs">
+                        <SelectValue placeholder="Select model..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AVAILABLE_MODELS.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            <div className="flex flex-col">
+                              <span className="font-medium">{model.name}</span>
+                              <span className="text-xs text-muted-foreground">{model.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {isModelSwitching && (
+                      <RefreshCw className="h-3 w-3 animate-spin text-muted-foreground" />
+                    )}
+                  </div>
+                  
                   {/* Service Status Display */}
-                  {(serviceStatus.hasError || nerStatus || serviceStatus.isLoading) && (
+                  {(serviceStatus.hasError || nerStatus || serviceStatus.isLoading || isModelSwitching) && (
                     <div className={`p-3 rounded-md text-sm ${
                       serviceStatus.hasError ? 'bg-destructive/10 text-destructive' :
-                      serviceStatus.isLoading || isRunningNER ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300' :
+                      serviceStatus.isLoading || isRunningNER || isModelSwitching ? 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300' :
                       'bg-muted'
                     }`}>
                       {serviceStatus.hasError && (
@@ -238,19 +313,12 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                           <span>{nerStatus}</span>
                         </div>
                       )}
-                      {serviceStatus.isLoading && !nerStatus && (
+                      {(serviceStatus.isLoading || isModelSwitching) && !nerStatus && (
                         <div className="flex items-center gap-2">
                           <RefreshCw className="h-4 w-4 animate-spin" />
-                          <span>Loading NER service...</span>
+                          <span>{isModelSwitching ? 'Switching model...' : 'Loading NER service...'}</span>
                         </div>
                       )}
-                    </div>
-                  )}
-                  
-                  {/* Service Info */}
-                  {serviceStatus.isInitialized && serviceStatus.modelId && (
-                    <div className="text-xs text-muted-foreground">
-                      Model: {serviceStatus.modelId}
                     </div>
                   )}
                   

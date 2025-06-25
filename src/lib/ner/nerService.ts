@@ -26,11 +26,34 @@ export interface NERStatus {
   modelId?: string;
 }
 
-// Try different models in order of preference
-const MODEL_OPTIONS = [
-  'onnx-community/gliner_small-v2.1',
-  'Xenova/bert-base-NER',
-  'Xenova/distilbert-base-cased-finetuned-conll03-english'
+export interface ModelInfo {
+  id: string;
+  name: string;
+  description: string;
+}
+
+// Available models with metadata
+export const AVAILABLE_MODELS: ModelInfo[] = [
+  {
+    id: 'onnx-community/gliner_small-v2.1',
+    name: 'GLiNER Small',
+    description: 'GLiNER v2.1 - Versatile entity recognition'
+  },
+  {
+    id: 'onnx-community/NeuroBERT-NER-ONNX',
+    name: 'NeuroBERT NER',
+    description: 'NeuroBERT optimized for NER tasks'
+  },
+  {
+    id: 'Xenova/bert-base-NER',
+    name: 'BERT Base NER',
+    description: 'BERT base model fine-tuned for NER'
+  },
+  {
+    id: 'Xenova/distilbert-base-cased-finetuned-conll03-english',
+    name: 'DistilBERT CoNLL03',
+    description: 'DistilBERT fine-tuned on CoNLL03 dataset'
+  }
 ];
 
 type CandidateLabels = string[];
@@ -51,7 +74,7 @@ const DEFAULT_LABELS: CandidateLabels = [
 ];
 
 /**
- * Enhanced NER Service with better error handling and debugging
+ * Enhanced NER Service with model selection support
  */
 class NERService {
   private classifier: any = null;
@@ -60,6 +83,7 @@ class NERService {
   private hasError = false;
   private errorMessage = '';
   private currentModelId = '';
+  private selectedModelId = AVAILABLE_MODELS[0].id; // Default to first model
 
   constructor() {
     console.log('[NER] Service initialized');
@@ -85,18 +109,27 @@ class NERService {
     return false;
   }
 
-  private async init() {
-    if (this.initialized || this.loading) {
-      console.log('[NER] Already initialized or loading');
+  private async init(modelId?: string) {
+    if (this.loading) {
+      console.log('[NER] Already loading');
+      return;
+    }
+    
+    const targetModelId = modelId || this.selectedModelId;
+    
+    // If we're already initialized with the same model, don't reload
+    if (this.initialized && this.currentModelId === targetModelId) {
+      console.log('[NER] Already initialized with target model');
       return;
     }
     
     this.loading = true;
     this.hasError = false;
     this.errorMessage = '';
+    this.initialized = false;
 
     try {
-      console.log('[NER] Starting initialization...');
+      console.log('[NER] Starting initialization with model:', targetModelId);
       
       // Configure environment for better performance
       env.backends.onnx.wasm.numThreads = Math.min(navigator.hardwareConcurrency ?? 4, 4);
@@ -104,21 +137,15 @@ class NERService {
       // Device preference order: webgpu -> wasm -> cpu
       const deviceOptions: DeviceType[] = ['webgpu', 'wasm', 'cpu'];
       
-      // Try each model until one works
-      let modelLoaded = false;
-      for (const modelId of MODEL_OPTIONS) {
-        console.log(`[NER] Trying model: ${modelId}`);
-        if (await this.tryInitializeModel(modelId, deviceOptions)) {
-          modelLoaded = true;
-          break;
-        }
-      }
+      // Try to load the specific model
+      const modelLoaded = await this.tryInitializeModel(targetModelId, deviceOptions);
       
       if (!modelLoaded) {
-        throw new Error('Failed to load any NER model');
+        throw new Error(`Failed to load model: ${targetModelId}`);
       }
 
       this.initialized = true;
+      this.selectedModelId = targetModelId;
       console.log(`[NER] Service ready with model: ${this.currentModelId}`);
     } catch (err) {
       this.hasError = true;
@@ -128,6 +155,35 @@ class NERService {
     } finally {
       this.loading = false;
     }
+  }
+
+  /**
+   * Switch to a different model
+   */
+  public async switchModel(modelId: string): Promise<void> {
+    console.log('[NER] Switching to model:', modelId);
+    
+    // Reset current state
+    this.classifier = null;
+    this.initialized = false;
+    this.currentModelId = '';
+    
+    // Initialize with new model
+    await this.init(modelId);
+  }
+
+  /**
+   * Get list of available models
+   */
+  public getAvailableModels(): ModelInfo[] {
+    return AVAILABLE_MODELS;
+  }
+
+  /**
+   * Get currently selected model info
+   */
+  public getCurrentModel(): ModelInfo | null {
+    return AVAILABLE_MODELS.find(model => model.id === this.currentModelId) || null;
   }
 
   /**
@@ -141,7 +197,6 @@ class NERService {
     
     console.log('[NER] Starting entity extraction');
     console.log('[NER] Input text length:', text?.length || 0);
-    console.log('[NER] Input text preview:', text?.substring(0, 100) + '...');
     
     // Validate input
     if (!text?.trim()) {
@@ -255,7 +310,7 @@ class NERService {
     return this.errorMessage;
   }
 
-  // Force reinitialize
+  // Force reinitialize with current selected model
   public async reinitialize(): Promise<void> {
     console.log('[NER] Force reinitializing...');
     this.initialized = false;
