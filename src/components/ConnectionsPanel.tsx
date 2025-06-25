@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+
+import React, { useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Link, Hash, AtSign, Database, GitBranch, Brain, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
