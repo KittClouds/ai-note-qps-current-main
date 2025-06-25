@@ -1,4 +1,3 @@
-
 import { pipeline, env } from '@huggingface/transformers';
 
 // Type declarations
@@ -35,24 +34,14 @@ export interface ModelInfo {
 // Available models with metadata
 export const AVAILABLE_MODELS: ModelInfo[] = [
   {
-    id: 'onnx-community/gliner_small-v2.1',
-    name: 'GLiNER Small',
-    description: 'GLiNER v2.1 - Versatile entity recognition'
-  },
-  {
     id: 'onnx-community/NeuroBERT-NER-ONNX',
     name: 'NeuroBERT NER',
     description: 'NeuroBERT optimized for NER tasks'
   },
   {
-    id: 'Xenova/bert-base-NER',
-    name: 'BERT Base NER',
-    description: 'BERT base model fine-tuned for NER'
-  },
-  {
-    id: 'onnx-community/TinyBERT-finetuned-NER-ONNX',
-    name: 'TinyBERT NER',
-    description: 'TinyBERT fine-tuned for NER tasks'
+    id: 'jdp8/wikineural-multilingual-ner',
+    name: 'WikiNER Multilingual',
+    description: 'WikiNER model for multilingual named entity recognition'
   }
 ];
 
