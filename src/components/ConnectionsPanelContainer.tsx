@@ -20,6 +20,7 @@ export const ConnectionsPanelContainer = ({ isOpen, onToggle }: ConnectionsPanel
   return (
     <ConnectionsPanel 
       connections={connections}
+      selectedNote={selectedNote}
       isOpen={isOpen}
       onToggle={onToggle}
     />

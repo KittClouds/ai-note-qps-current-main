@@ -1,5 +1,5 @@
-
 // Updated parsing utilities for TipTap schema integration
+import { NEREntity } from '@/lib/ner/nerService';
 
 export interface Entity {
   kind: string;
@@ -21,6 +21,7 @@ export interface ParsedConnections {
   entities: Entity[];
   triples: Triple[];
   backlinks: string[]; // Stores backlink titles from <<title>> - THESE ARE DISPLAY-ONLY
+  nerEntities?: NEREntity[]; // Add NER entities
 }
 
 // Helper to extract text from TipTap JSON node recursively
