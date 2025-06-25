@@ -37,11 +37,6 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     id: 'onnx-community/NeuroBERT-NER-ONNX',
     name: 'NeuroBERT NER',
     description: 'NeuroBERT optimized for NER tasks'
-  },
-  {
-    id: 'jdp8/wikineural-multilingual-ner',
-    name: 'WikiNER Multilingual',
-    description: 'WikiNER model for multilingual named entity recognition'
   }
 ];
 
