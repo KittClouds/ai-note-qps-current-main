@@ -50,9 +50,9 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
     description: 'BERT base model fine-tuned for NER'
   },
   {
-    id: 'Xenova/distilbert-base-cased-finetuned-conll03-english',
-    name: 'DistilBERT CoNLL03',
-    description: 'DistilBERT fine-tuned on CoNLL03 dataset'
+    id: 'onnx-community/TinyBERT-finetuned-NER-ONNX',
+    name: 'TinyBERT NER',
+    description: 'TinyBERT fine-tuned for NER tasks'
   }
 ];
 
