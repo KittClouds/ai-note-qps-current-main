@@ -37,7 +37,7 @@ const DEFAULT_LABELS: CandidateLabels = [
  * GLiNER expects an additional `labels` input for zero-shot entity recognition.
  */
 class NERService {
-  private classifier: Awaited<ReturnType<typeof pipeline>> | null = null;
+  private classifier: any = null;
   private initialized = false;
   private loading = false;
 
@@ -57,8 +57,7 @@ class NERService {
         'token-classification',
         MODEL_ID,
         { 
-          device: 'webgpu', // Try WebGPU first, fallback to WASM
-          awaitNextFrame: true // Keep UI responsive during loading
+          device: 'webgpu' // Try WebGPU first, fallback to WASM
         }
       );
 
