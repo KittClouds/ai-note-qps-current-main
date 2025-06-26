@@ -170,12 +170,14 @@ const RightSidebar = React.forwardRef<
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-side="right"
       >
+        {/* Spacer div that reserves layout space */}
         <div
           className={cn(
             "duration-200 relative h-svh w-[--right-sidebar-width] bg-transparent transition-[width] ease-linear",
             "group-data-[collapsible=offcanvas]:w-0"
           )}
         />
+        {/* Fixed positioned sidebar content */}
         <div
           className={cn(
             "duration-200 fixed inset-y-0 z-10 hidden h-svh w-[--right-sidebar-width] transition-[right,width] ease-linear md:flex",
