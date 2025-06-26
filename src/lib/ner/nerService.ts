@@ -1,10 +1,4 @@
-
 import { pipeline, env } from '@huggingface/transformers';
-
-// Add BigInt serialization support
-(BigInt.prototype as any).toJSON = function() {
-  return this.toString();
-};
 
 // Type declarations
 export interface NEREntity {
@@ -85,11 +79,7 @@ class NERService {
         console.log(`[NER] Attempting to load model ${modelId} on device: ${device}`);
         
         const startTime = Date.now();
-        this.classifier = await pipeline('token-classification', modelId, { 
-          device,
-          // Add additional options to handle BigInt serialization
-          dtype: 'fp32'
-        });
+        this.classifier = await pipeline('token-classification', modelId, { device });
         const loadTime = Date.now() - startTime;
         
         console.log(`[NER] Successfully loaded model ${modelId} on ${device} in ${loadTime}ms`);
@@ -125,11 +115,11 @@ class NERService {
     try {
       console.log('[NER] Starting initialization with model:', targetModelId);
       
-      // Configure environment for better performance and BigInt handling
+      // Configure environment for better performance
       env.backends.onnx.wasm.numThreads = Math.min(navigator.hardwareConcurrency ?? 4, 4);
       
-      // Device preference order: wasm -> cpu (avoiding webgpu for now to prevent BigInt issues)
-      const deviceOptions: DeviceType[] = ['wasm', 'cpu'];
+      // Device preference order: webgpu -> wasm -> cpu
+      const deviceOptions: DeviceType[] = ['webgpu', 'wasm', 'cpu'];
       
       // Try to load the specific model
       const modelLoaded = await this.tryInitializeModel(targetModelId, deviceOptions);
