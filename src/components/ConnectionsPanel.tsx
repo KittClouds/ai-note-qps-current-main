@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ParsedConnections } from '@/utils/parsingUtils';
-import { nerService, NEREntity, AVAILABLE_MODELS, ModelInfo } from '@/lib/ner/nerService';
+import { nerServiceManager, AVAILABLE_NER_MODELS, UnifiedModelInfo, UnifiedNERResult } from '@/lib/ner/nerServiceManager';
 import { extractTextFromNoteContent } from '@/lib/ner/textProcessing';
 import { useToast } from '@/hooks/use-toast';
 
@@ -21,10 +21,10 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const [relationshipsExpanded, setRelationshipsExpanded] = useState(true);
   const [nerEntitiesExpanded, setNerEntitiesExpanded] = useState(true);
   const [isRunningNER, setIsRunningNER] = useState(false);
-  const [nerEntities, setNerEntities] = useState<NEREntity[]>([]);
+  const [nerResult, setNerResult] = useState<UnifiedNERResult | null>(null);
   const [nerStatus, setNerStatus] = useState<string>('');
   const [nerNoteId, setNerNoteId] = useState<string | null>(null);
-  const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
+  const [currentModel, setCurrentModel] = useState<UnifiedModelInfo | null>(null);
   const [isModelSwitching, setIsModelSwitching] = useState(false);
   const { toast } = useToast();
 
@@ -32,12 +32,12 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const tripleCount = connections?.triples.length || 0;
   const linkCount = connections?.links.length || 0;
   const crosslinkCount = connections?.crosslinks?.length || 0;
-  const nerEntityCount = nerEntities.length;
+  const nerEntityCount = nerResult?.entities.length || 0;
 
   // Clear NER state when note changes
   React.useEffect(() => {
     if (selectedNote?.id !== nerNoteId) {
-      setNerEntities([]);
+      setNerResult(null);
       setNerStatus('');
       setNerNoteId(null);
     }
@@ -45,25 +45,27 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
 
   // Initialize current model on component mount
   React.useEffect(() => {
-    const serviceStatus = nerService.getStatus();
+    const serviceStatus = nerServiceManager.getStatus();
     if (serviceStatus.isInitialized) {
-      setCurrentModel(nerService.getCurrentModel());
+      setCurrentModel(nerServiceManager.getCurrentModel());
     }
   }, []);
 
   const handleModelChange = useCallback(async (modelId: string) => {
     console.log('[ConnectionsPanel] Switching to model:', modelId);
+    const targetModel = AVAILABLE_NER_MODELS.find(model => model.id === modelId);
+    
     setIsModelSwitching(true);
-    setNerStatus('Switching model...');
+    setNerStatus(`Switching to ${targetModel?.name || modelId}...`);
     
     try {
-      await nerService.switchModel(modelId);
-      const newModel = nerService.getCurrentModel();
+      await nerServiceManager.switchModel(modelId);
+      const newModel = nerServiceManager.getCurrentModel();
       setCurrentModel(newModel);
       setNerStatus('');
       
       // Clear previous results when switching models
-      setNerEntities([]);
+      setNerResult(null);
       setNerNoteId(null);
       
       toast({
@@ -106,7 +108,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
           description: "The selected note doesn't contain any text to analyze.",
           variant: "destructive"
         });
-        setNerEntities([]);
+        setNerResult(null);
         setNerNoteId(selectedNote.id);
         return;
       }
@@ -119,7 +121,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
           description: "The note needs more text content for NER analysis.",
           variant: "destructive"
         });
-        setNerEntities([]);
+        setNerResult(null);
         setNerNoteId(selectedNote.id);
         return;
       }
@@ -127,7 +129,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
       setNerStatus('Initializing NER service...');
       
       // Get current service status
-      const serviceStatus = nerService.getStatus();
+      const serviceStatus = nerServiceManager.getStatus();
       console.log('[ConnectionsPanel] NER service status:', serviceStatus);
       
       if (serviceStatus.hasError) {
@@ -140,29 +142,31 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
         return;
       }
       
-      setNerStatus('Running NER analysis...');
-      const result = await nerService.extractEntities(plainText);
+      const providerName = serviceStatus.provider === 'huggingface' ? 'HuggingFace' : 'Wink NLP';
+      setNerStatus(`Running ${providerName} analysis...`);
+      
+      const result = await nerServiceManager.extractEntities(plainText);
       
       console.log('[ConnectionsPanel] NER result:', result);
       
-      setNerEntities(result.entities);
+      setNerResult(result);
       setNerNoteId(selectedNote.id);
       setNerStatus('');
       
       // Update current model info
-      setCurrentModel(nerService.getCurrentModel());
+      setCurrentModel(nerServiceManager.getCurrentModel());
       
       // Show success toast with results
       toast({
         title: "NER Analysis Complete",
-        description: `Found ${result.totalCount} entities in ${result.processingTime}ms`,
+        description: `Found ${result.totalCount} entities using ${providerName} in ${result.processingTime}ms`,
       });
       
     } catch (error) {
       console.error('[ConnectionsPanel] Error during NER analysis:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setNerStatus(`Error: ${errorMessage}`);
-      setNerEntities([]);
+      setNerResult(null);
       setNerNoteId(selectedNote.id);
       
       toast({
@@ -178,8 +182,8 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const handleReinitializeNER = useCallback(async () => {
     setNerStatus('Reinitializing NER service...');
     try {
-      await nerService.reinitialize();
-      setCurrentModel(nerService.getCurrentModel());
+      await nerServiceManager.reinitialize();
+      setCurrentModel(nerServiceManager.getCurrentModel());
       setNerStatus('');
       toast({
         title: "NER Service Reinitialized",
@@ -196,15 +200,15 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
     }
   }, [toast]);
 
-  const groupedNerEntities = nerEntities.reduce((acc, entity) => {
+  const groupedNerEntities = nerResult?.entities.reduce((acc, entity) => {
     if (!acc[entity.type]) {
       acc[entity.type] = [];
     }
     acc[entity.type].push(entity);
     return acc;
-  }, {} as Record<string, NEREntity[]>);
+  }, {} as Record<string, typeof nerResult.entities>) || {};
 
-  const serviceStatus = nerService.getStatus();
+  const serviceStatus = nerServiceManager.getStatus();
 
   // Only show NER entities if they belong to the current note
   const showNerEntities = nerEntityCount > 0 && nerNoteId === selectedNote?.id;
@@ -289,15 +293,15 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">Model:</span>
                     <Select 
-                      value={currentModel?.id || AVAILABLE_MODELS[0].id} 
+                      value={currentModel?.id || AVAILABLE_NER_MODELS[0].id} 
                       onValueChange={handleModelChange}
                       disabled={isModelSwitching || isRunningNER}
                     >
-                      <SelectTrigger className="w-auto min-w-[200px] h-8 text-xs">
+                      <SelectTrigger className="w-auto min-w-[250px] h-8 text-xs">
                         <SelectValue placeholder="Select model..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {AVAILABLE_MODELS.map((model) => (
+                        {AVAILABLE_NER_MODELS.map((model) => (
                           <SelectItem key={model.id} value={model.id}>
                             <div className="flex flex-col">
                               <span className="font-medium">{model.name}</span>
@@ -362,6 +366,9 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                           <div className="flex items-center gap-2">
                             <Brain className="h-4 w-4" />
                             <span className="font-medium">Named Entities ({nerEntityCount})</span>
+                            <span className="text-xs px-2 py-1 bg-muted rounded">
+                              {nerResult?.provider}
+                            </span>
                           </div>
                           {nerEntitiesExpanded ? (
                             <ChevronDown className="h-3 w-3" />
