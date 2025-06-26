@@ -54,14 +54,11 @@ export function calculateAvailableWidth(options: {
     return '100%';
   }
 
+  // Only account for left sidebar width since right sidebar handles its own spacing
   let totalSidebarWidth = 0;
   
   if (leftSidebarOpen) {
     totalSidebarWidth += LAYOUT_CONSTANTS.LEFT_SIDEBAR_WIDTH;
-  }
-  
-  if (rightSidebarOpen) {
-    totalSidebarWidth += LAYOUT_CONSTANTS.RIGHT_SIDEBAR_WIDTH;
   }
 
   return totalSidebarWidth > 0 
