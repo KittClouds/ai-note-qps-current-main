@@ -45,6 +45,7 @@ type DeviceType = 'webgpu' | 'wasm' | 'cpu';
 
 // Default entity labels for NeuroBERT
 const DEFAULT_LABELS: CandidateLabels = [
+  'PERSON',
   'CARDINAL',
   'DATE',
   'EVENT',
@@ -58,7 +59,6 @@ const DEFAULT_LABELS: CandidateLabels = [
   'ORDINAL',
   'ORG',
   'PERCENT',
-  'PERSON',
   'PRODUCT',
   'QUANTITY',
   'TIME',
