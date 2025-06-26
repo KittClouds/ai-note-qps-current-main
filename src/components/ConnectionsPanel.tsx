@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback } from 'react';
 import { ChevronDown, ChevronRight, Link, Hash, AtSign, Database, GitBranch, Brain, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,6 +23,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const [isRunningNER, setIsRunningNER] = useState(false);
   const [nerEntities, setNerEntities] = useState<NEREntity[]>([]);
   const [nerStatus, setNerStatus] = useState<string>('');
+  const [nerNoteId, setNerNoteId] = useState<string | null>(null);
   const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
   const [isModelSwitching, setIsModelSwitching] = useState(false);
   const { toast } = useToast();
@@ -33,6 +33,15 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const linkCount = connections?.links.length || 0;
   const crosslinkCount = connections?.crosslinks?.length || 0;
   const nerEntityCount = nerEntities.length;
+
+  // Clear NER state when note changes
+  React.useEffect(() => {
+    if (selectedNote?.id !== nerNoteId) {
+      setNerEntities([]);
+      setNerStatus('');
+      setNerNoteId(null);
+    }
+  }, [selectedNote?.id, nerNoteId]);
 
   // Initialize current model on component mount
   React.useEffect(() => {
@@ -55,6 +64,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
       
       // Clear previous results when switching models
       setNerEntities([]);
+      setNerNoteId(null);
       
       toast({
         title: "Model Switched",
@@ -97,6 +107,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
           variant: "destructive"
         });
         setNerEntities([]);
+        setNerNoteId(selectedNote.id);
         return;
       }
       
@@ -109,6 +120,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
           variant: "destructive"
         });
         setNerEntities([]);
+        setNerNoteId(selectedNote.id);
         return;
       }
       
@@ -134,6 +146,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
       console.log('[ConnectionsPanel] NER result:', result);
       
       setNerEntities(result.entities);
+      setNerNoteId(selectedNote.id);
       setNerStatus('');
       
       // Update current model info
@@ -150,6 +163,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setNerStatus(`Error: ${errorMessage}`);
       setNerEntities([]);
+      setNerNoteId(selectedNote.id);
       
       toast({
         title: "NER Analysis Failed",
@@ -191,6 +205,9 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   }, {} as Record<string, NEREntity[]>);
 
   const serviceStatus = nerService.getStatus();
+
+  // Only show NER entities if they belong to the current note
+  const showNerEntities = nerEntityCount > 0 && nerNoteId === selectedNote?.id;
 
   return (
     <div className="border-t bg-background">
@@ -237,7 +254,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                 </TabsTrigger>
                 <TabsTrigger value="ner" className="flex items-center gap-1">
                   <Brain className="h-3 w-3" />
-                  NER ({nerEntityCount})
+                  NER ({showNerEntities ? nerEntityCount : 0})
                 </TabsTrigger>
               </TabsList>
 
@@ -330,7 +347,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                     </div>
                   )}
                   
-                  {selectedNote && nerEntityCount === 0 && !isRunningNER && !nerStatus && (
+                  {selectedNote && !showNerEntities && !isRunningNER && !nerStatus && (
                     <div className="text-center py-8 text-muted-foreground">
                       <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">No named entities detected</p>
@@ -338,7 +355,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                     </div>
                   )}
                   
-                  {nerEntityCount > 0 && (
+                  {showNerEntities && (
                     <Collapsible open={nerEntitiesExpanded} onOpenChange={setNerEntitiesExpanded}>
                       <CollapsibleTrigger asChild>
                         <Button variant="ghost" className="w-full justify-between p-2 h-auto">
