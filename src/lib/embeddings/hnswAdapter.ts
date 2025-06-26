@@ -7,16 +7,36 @@ import { SimilarityIndex } from './graphrag';
  */
 export class HNSWAdapter implements SimilarityIndex {
   private hnsw: HNSW;
-  private nodeIdMap: Map<string, number> = new Map(); // Maps string IDs to numeric IDs
-  private reverseNodeIdMap: Map<number, string> = new Map(); // Maps numeric IDs back to string IDs
+  private nodeIdMap: Map<string, number> = new Map();
+  private reverseNodeIdMap: Map<number, string> = new Map();
   private nextNodeId = 0;
+  private dimension: number;
 
   constructor(dimension: number = 384, M: number = 16, efConstruction: number = 200) {
+    this.dimension = dimension;
     this.hnsw = new HNSW(M, efConstruction, 'cosine');
+  }
+
+  updateDimension(newDimension: number): void {
+    if (this.hnsw.nodes.size > 0) {
+      console.warn('Updating dimension on non-empty HNSW index. Clearing existing data.');
+      this.clear();
+    }
+    this.dimension = newDimension;
+  }
+
+  getDimension(): number {
+    return this.dimension;
   }
 
   addItems(items: Array<{ id: string; embedding: number[] }>): void {
     for (const item of items) {
+      // Validate dimension
+      if (item.embedding.length !== this.dimension) {
+        console.warn(`Embedding dimension mismatch: expected ${this.dimension}, got ${item.embedding.length}`);
+        continue;
+      }
+
       // Convert string ID to numeric ID for HNSW
       let numericId = this.nodeIdMap.get(item.id);
       if (numericId === undefined) {
@@ -28,7 +48,6 @@ export class HNSWAdapter implements SimilarityIndex {
       try {
         this.hnsw.addPoint(numericId, new Float32Array(item.embedding));
       } catch (error) {
-        // Handle case where point already exists by updating it
         if (error.message.includes('already exists')) {
           console.warn(`Point ${item.id} (${numericId}) already exists in HNSW, skipping...`);
         } else {
