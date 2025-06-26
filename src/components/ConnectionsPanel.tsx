@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ParsedConnections } from '@/utils/parsingUtils';
-import { nerService, NEREntity, AVAILABLE_MODELS, ModelInfo } from '@/lib/ner/nerService';
+import { nerManager, NEREntity, AVAILABLE_MODELS, ModelInfo } from '@/lib/ner/nerManager';
 import { extractTextFromNoteContent } from '@/lib/ner/textProcessing';
 import { useToast } from '@/hooks/use-toast';
 
@@ -45,9 +45,9 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
 
   // Initialize current model on component mount
   React.useEffect(() => {
-    const serviceStatus = nerService.getStatus();
+    const serviceStatus = nerManager.getStatus();
     if (serviceStatus.isInitialized) {
-      setCurrentModel(nerService.getCurrentModel());
+      setCurrentModel(nerManager.getCurrentModel());
     }
   }, []);
 
@@ -57,8 +57,8 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
     setNerStatus('Switching model...');
     
     try {
-      await nerService.switchModel(modelId);
-      const newModel = nerService.getCurrentModel();
+      await nerManager.switchModel(modelId);
+      const newModel = nerManager.getCurrentModel();
       setCurrentModel(newModel);
       setNerStatus('');
       
@@ -127,7 +127,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
       setNerStatus('Initializing NER service...');
       
       // Get current service status
-      const serviceStatus = nerService.getStatus();
+      const serviceStatus = nerManager.getStatus();
       console.log('[ConnectionsPanel] NER service status:', serviceStatus);
       
       if (serviceStatus.hasError) {
@@ -141,7 +141,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
       }
       
       setNerStatus('Running NER analysis...');
-      const result = await nerService.extractEntities(plainText);
+      const result = await nerManager.extractEntities(plainText);
       
       console.log('[ConnectionsPanel] NER result:', result);
       
@@ -150,7 +150,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
       setNerStatus('');
       
       // Update current model info
-      setCurrentModel(nerService.getCurrentModel());
+      setCurrentModel(nerManager.getCurrentModel());
       
       // Show success toast with results
       toast({
@@ -178,8 +178,8 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
   const handleReinitializeNER = useCallback(async () => {
     setNerStatus('Reinitializing NER service...');
     try {
-      await nerService.reinitialize();
-      setCurrentModel(nerService.getCurrentModel());
+      await nerManager.reinitialize();
+      setCurrentModel(nerManager.getCurrentModel());
       setNerStatus('');
       toast({
         title: "NER Service Reinitialized",
@@ -204,7 +204,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
     return acc;
   }, {} as Record<string, NEREntity[]>);
 
-  const serviceStatus = nerService.getStatus();
+  const serviceStatus = nerManager.getStatus();
 
   // Only show NER entities if they belong to the current note
   const showNerEntities = nerEntityCount > 0 && nerNoteId === selectedNote?.id;
