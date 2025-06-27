@@ -1,4 +1,3 @@
-
 // --- Core Graph Types ---
 
 export interface EdgeTypeDefinition {
@@ -48,7 +47,7 @@ export class GraphRAG {
   private dimension: number;
   private edgeTypeDefinitions: Map<string, EdgeTypeDefinition>;
 
-  constructor(dimension: number = 384) { // Changed from 1536 to 384
+  constructor(dimension: number = 384) {
     this.nodes = new Map();
     this.edges = [];
     this.dimension = dimension;
@@ -56,6 +55,18 @@ export class GraphRAG {
 
     // Register a default 'semantic' edge type
     this.defineEdgeType('semantic', { symmetrical: true });
+  }
+
+  // Add method to update dimensions
+  updateDimension(newDimension: number): void {
+    if (this.nodes.size > 0) {
+      console.warn('Updating dimension on non-empty graph. Existing embeddings may be incompatible.');
+    }
+    this.dimension = newDimension;
+  }
+
+  getDimension(): number {
+    return this.dimension;
   }
 
   // --- 1. Edge-Type Registry ---
