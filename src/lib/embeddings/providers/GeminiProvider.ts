@@ -9,7 +9,7 @@ export interface GeminiEmbeddingResponse {
 
 export class GeminiProvider extends BaseEmbeddingProvider {
   readonly name = 'Google Gemini';
-  readonly dimension = 768;
+  readonly dimension = 3072; // Updated to match actual API response
   readonly maxBatchSize = 5;
   
   private apiKey: string | null = null;
