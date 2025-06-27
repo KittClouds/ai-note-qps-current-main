@@ -1,8 +1,8 @@
-
 import { nerService as huggingFaceService, NEREntity, NERResult, NERStatus, ModelInfo, AVAILABLE_MODELS } from './nerService';
 import { winkNERService, WinkNEREntity, WinkNERResult, WinkNERStatus } from './winkService';
+import { enhancedWinkNERService, EnhancedWinkNERResult } from './enhancedWinkService';
 
-export type NERProvider = 'huggingface' | 'wink';
+export type NERProvider = 'huggingface' | 'wink' | 'enhanced-wink';
 
 export interface UnifiedModelInfo {
   id: string;
@@ -11,7 +11,7 @@ export interface UnifiedModelInfo {
   provider: NERProvider;
 }
 
-// Extended model list with both providers
+// Extended model list with enhanced Wink option
 export const AVAILABLE_NER_MODELS: UnifiedModelInfo[] = [
   // HuggingFace models
   ...AVAILABLE_MODELS.map(model => ({
@@ -19,11 +19,18 @@ export const AVAILABLE_NER_MODELS: UnifiedModelInfo[] = [
     name: `${model.name} (HuggingFace)`,
     provider: 'huggingface' as NERProvider
   })),
-  // Wink models
+  // Enhanced Wink with custom patterns (recommended)
+  {
+    id: 'wink-eng-lite-web-model-enhanced',
+    name: 'Wink NLP Enhanced (Recommended)',
+    description: 'Wink NLP with custom patterns for improved entity detection',
+    provider: 'enhanced-wink' as NERProvider
+  },
+  // Basic Wink models
   {
     id: 'wink-eng-lite-web-model',
-    name: 'Wink NLP Basic (Wink)',
-    description: 'Basic NER using Wink NLP',
+    name: 'Wink NLP Basic',
+    description: 'Basic NER using Wink NLP without custom patterns',
     provider: 'wink' as NERProvider
   }
 ];
@@ -35,6 +42,10 @@ export interface UnifiedNERResult {
   processingTime?: number;
   textLength?: number;
   provider: NERProvider;
+  // Enhanced fields for pattern-based results
+  patternMatches?: number;
+  customEntities?: number;
+  patternsUsed?: string[];
 }
 
 export interface UnifiedNERStatus {
@@ -44,21 +55,24 @@ export interface UnifiedNERStatus {
   errorMessage?: string;
   modelId?: string;
   provider: NERProvider;
+  // Enhanced status fields
+  patternsInitialized?: boolean;
+  patternStats?: any;
 }
 
 /**
- * NER Service Manager - Handles switching between HuggingFace and Wink services
+ * Enhanced NER Service Manager with Custom Patterns Support
  */
 class NERServiceManager {
-  private currentProvider: NERProvider = 'huggingface';
-  private currentModelId: string = AVAILABLE_MODELS[0].id;
+  private currentProvider: NERProvider = 'enhanced-wink'; // Default to enhanced version
+  private currentModelId: string = 'wink-eng-lite-web-model-enhanced';
 
   constructor() {
-    console.log('[NERManager] Service manager initialized');
+    console.log('[NERManager] Enhanced service manager initialized');
   }
 
   /**
-   * Get list of all available models from both providers
+   * Get list of all available models from all providers
    */
   public getAvailableModels(): UnifiedModelInfo[] {
     return AVAILABLE_NER_MODELS;
@@ -91,9 +105,14 @@ class NERServiceManager {
     if (this.currentProvider === 'huggingface') {
       await huggingFaceService.switchModel(modelId);
     } else if (this.currentProvider === 'wink') {
-      // Wink only has one model, so just ensure it's initialized
+      // Basic Wink - just ensure it's initialized
       if (!winkNERService.isInitialized() && !winkNERService.isLoading()) {
         await winkNERService.reinitialize();
+      }
+    } else if (this.currentProvider === 'enhanced-wink') {
+      // Enhanced Wink with patterns
+      if (!enhancedWinkNERService.isInitialized() && !enhancedWinkNERService.isLoading()) {
+        await enhancedWinkNERService.reinitialize();
       }
     }
   }
@@ -113,6 +132,12 @@ class NERServiceManager {
       return {
         ...result,
         provider: 'wink'
+      };
+    } else if (this.currentProvider === 'enhanced-wink') {
+      const result = await enhancedWinkNERService.extractEntities(text);
+      return {
+        ...result,
+        provider: 'enhanced-wink'
       };
     } else {
       throw new Error(`Unknown provider: ${this.currentProvider}`);
@@ -135,6 +160,12 @@ class NERServiceManager {
         ...status,
         provider: 'wink'
       };
+    } else if (this.currentProvider === 'enhanced-wink') {
+      const status = enhancedWinkNERService.getStatus();
+      return {
+        ...status,
+        provider: 'enhanced-wink'
+      };
     } else {
       return {
         isInitialized: false,
@@ -156,6 +187,8 @@ class NERServiceManager {
       await huggingFaceService.reinitialize();
     } else if (this.currentProvider === 'wink') {
       await winkNERService.reinitialize();
+    } else if (this.currentProvider === 'enhanced-wink') {
+      await enhancedWinkNERService.reinitialize();
     }
   }
 
@@ -174,6 +207,8 @@ class NERServiceManager {
       return huggingFaceService.isInitialized();
     } else if (this.currentProvider === 'wink') {
       return winkNERService.isInitialized();
+    } else if (this.currentProvider === 'enhanced-wink') {
+      return enhancedWinkNERService.isInitialized();
     }
     return false;
   }
@@ -186,6 +221,8 @@ class NERServiceManager {
       return huggingFaceService.isLoading();
     } else if (this.currentProvider === 'wink') {
       return winkNERService.isLoading();
+    } else if (this.currentProvider === 'enhanced-wink') {
+      return enhancedWinkNERService.isLoading();
     }
     return false;
   }
@@ -198,8 +235,29 @@ class NERServiceManager {
       return huggingFaceService.hasErrors();
     } else if (this.currentProvider === 'wink') {
       return winkNERService.hasErrors();
+    } else if (this.currentProvider === 'enhanced-wink') {
+      return enhancedWinkNERService.hasErrors();
     }
     return false;
+  }
+
+  /**
+   * Get pattern statistics (only available for enhanced-wink)
+   */
+  public getPatternStats(): any {
+    if (this.currentProvider === 'enhanced-wink') {
+      return enhancedWinkNERService.getPatternStats();
+    }
+    return null;
+  }
+
+  /**
+   * Reload patterns (only available for enhanced-wink)
+   */
+  public async reloadPatterns(): Promise<void> {
+    if (this.currentProvider === 'enhanced-wink') {
+      await enhancedWinkNERService.reloadPatterns();
+    }
   }
 }
 
