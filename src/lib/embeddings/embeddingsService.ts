@@ -1,3 +1,4 @@
+
 import { GraphRAG, GraphNode, RankedNode } from './graphrag';
 import { HNSWAdapter } from './hnswAdapter';
 import { createNoteChunks, TextChunk, preprocessText } from './textProcessing';
@@ -40,17 +41,20 @@ export class EmbeddingsService {
   private isInitialized = false;
   private noteMetadata = new Map<string, { title: string; noteId: string }>();
   private currentProvider: EmbeddingProvider | null = null;
+  private currentDimension: number = 384; // Track current dimension
 
   constructor() {
     // Initialize with default dimensions - will be updated when provider is set
-    this.graphRAG = new GraphRAG(384);
-    this.hnswAdapter = new HNSWAdapter(384);
+    this.graphRAG = new GraphRAG(this.currentDimension);
+    this.hnswAdapter = new HNSWAdapter(this.currentDimension);
   }
 
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
+      console.log('[EmbeddingsService] Initializing...');
+      
       // Initialize provider registry
       await providerRegistry.initializeFromStorage();
       this.currentProvider = providerRegistry.getActiveProvider();
@@ -59,10 +63,13 @@ export class EmbeddingsService {
         throw new Error('No embedding provider available');
       }
 
-      // Update dimensions based on active provider
-      this.updateDimensions(this.currentProvider.dimension);
+      console.log(`[EmbeddingsService] Active provider: ${this.currentProvider.name} (${this.currentProvider.dimension}D)`);
+
+      // Update dimensions based on active provider BEFORE any operations
+      await this.updateDimensions(this.currentProvider.dimension);
       
       this.isInitialized = true;
+      console.log('[EmbeddingsService] Initialization complete');
     } catch (error) {
       console.error('Failed to initialize embeddings service:', error);
       throw error;
@@ -71,6 +78,8 @@ export class EmbeddingsService {
 
   async switchProvider(providerId: string, apiKey?: string): Promise<void> {
     try {
+      console.log(`[EmbeddingsService] Switching to provider: ${providerId}`);
+      
       // Set API key for Gemini if provided
       if (providerId === 'gemini' && apiKey) {
         const geminiProvider = providerRegistry.getProvider('gemini') as any;
@@ -83,8 +92,8 @@ export class EmbeddingsService {
       this.currentProvider = providerRegistry.getActiveProvider();
       
       if (this.currentProvider) {
-        this.updateDimensions(this.currentProvider.dimension);
-        console.log(`Switched to ${this.currentProvider.name} (${this.currentProvider.dimension}D)`);
+        console.log(`[EmbeddingsService] Provider switched to ${this.currentProvider.name} (${this.currentProvider.dimension}D)`);
+        await this.updateDimensions(this.currentProvider.dimension);
       }
     } catch (error) {
       console.error('Failed to switch provider:', error);
@@ -92,13 +101,25 @@ export class EmbeddingsService {
     }
   }
 
-  private updateDimensions(dimension: number): void {
+  private async updateDimensions(newDimension: number): Promise<void> {
+    if (this.currentDimension === newDimension) {
+      console.log(`[EmbeddingsService] Dimension already set to ${newDimension}, skipping update`);
+      return;
+    }
+
+    console.log(`[EmbeddingsService] Updating dimensions from ${this.currentDimension} to ${newDimension}`);
+    
     // Clear existing data when switching dimensions
     this.clear();
     
+    // Update dimension tracking
+    this.currentDimension = newDimension;
+    
     // Recreate components with new dimensions
-    this.graphRAG = new GraphRAG(dimension);
-    this.hnswAdapter = new HNSWAdapter(dimension);
+    this.graphRAG = new GraphRAG(newDimension);
+    this.hnswAdapter = new HNSWAdapter(newDimension);
+    
+    console.log(`[EmbeddingsService] Components recreated with ${newDimension}D`);
   }
 
   getCurrentProvider(): EmbeddingProvider | null {
@@ -110,8 +131,24 @@ export class EmbeddingsService {
       throw new Error('No embedding provider initialized');
     }
 
+    // Validate provider dimensions match our current setup
+    if (this.currentProvider.dimension !== this.currentDimension) {
+      console.warn(`[EmbeddingsService] Dimension mismatch detected! Provider: ${this.currentProvider.dimension}D, Service: ${this.currentDimension}D`);
+      await this.updateDimensions(this.currentProvider.dimension);
+    }
+
     const texts = Array.isArray(text) ? text : [text];
-    return await this.currentProvider.generateEmbeddings(texts, { isQuery });
+    console.log(`[EmbeddingsService] Generating embeddings for ${texts.length} texts using ${this.currentProvider.name} (${this.currentProvider.dimension}D)`);
+    
+    const embeddings = await this.currentProvider.generateEmbeddings(texts, { isQuery });
+    
+    // Validate embedding dimensions
+    if (embeddings.length > 0 && embeddings[0].length !== this.currentDimension) {
+      throw new Error(`Embedding dimension mismatch: expected ${this.currentDimension}, got ${embeddings[0].length}`);
+    }
+    
+    console.log(`[EmbeddingsService] Generated ${embeddings.length} embeddings of ${embeddings[0]?.length || 0} dimensions`);
+    return embeddings;
   }
 
   /**
@@ -129,6 +166,8 @@ export class EmbeddingsService {
     }
 
     try {
+      console.log(`[EmbeddingsService] Adding note ${noteId} using ${chunkingMethod} chunking`);
+      
       let chunks: TextChunk[];
       
       // Use semantic chunking if requested
@@ -160,13 +199,22 @@ export class EmbeddingsService {
       const chunkTexts = chunks.map(chunk => chunk.text);
       const embeddings = await this.generateEmbeddings(chunkTexts);
 
+      console.log(`[EmbeddingsService] Processing ${chunks.length} chunks for note ${noteId}`);
+
       // Add nodes to GraphRAG
       chunks.forEach((chunk, index) => {
         const nodeId = `${noteId}_chunk_${index}`;
+        const embedding = embeddings[index];
+        
+        // Validate embedding before adding
+        if (!embedding || embedding.length !== this.currentDimension) {
+          throw new Error(`Invalid embedding for chunk ${index}: expected ${this.currentDimension}D, got ${embedding?.length || 0}D`);
+        }
+        
         const node: GraphNode = {
           id: nodeId,
           content: chunk.text,
-          embedding: embeddings[index],
+          embedding: embedding,
           metadata: {
             ...chunk.metadata,
             originalNoteId: noteId,
@@ -191,7 +239,7 @@ export class EmbeddingsService {
         k: 10 
       });
 
-      console.log(`Added note ${noteId} with ${chunks.length} chunks using ${chunkingMethod} chunking to knowledge graph`);
+      console.log(`[EmbeddingsService] Successfully added note ${noteId} with ${chunks.length} chunks to knowledge graph`);
     } catch (error) {
       console.error(`Failed to add note ${noteId} to embeddings:`, error);
       throw error;
@@ -245,12 +293,18 @@ export class EmbeddingsService {
     }
 
     try {
+      console.log(`[EmbeddingsService] Searching for: "${query}" (top ${topK})`);
+      
       const processedQuery = preprocessText(query);
       const queryEmbeddings = await this.generateEmbeddings(processedQuery, true);
       const queryEmbedding = queryEmbeddings[0];
 
       if (!queryEmbedding) {
         throw new Error('Failed to generate query embedding');
+      }
+
+      if (queryEmbedding.length !== this.currentDimension) {
+        throw new Error(`Query embedding dimension mismatch: expected ${this.currentDimension}, got ${queryEmbedding.length}`);
       }
 
       const results = this.graphRAG.query({
@@ -262,7 +316,7 @@ export class EmbeddingsService {
       });
 
       // Convert to SearchResult format
-      return results.map(result => {
+      const searchResults = results.map(result => {
         const metadata = this.noteMetadata.get(result.id);
         return {
           noteId: result.metadata?.originalNoteId || result.id,
@@ -271,6 +325,9 @@ export class EmbeddingsService {
           score: result.score
         };
       });
+
+      console.log(`[EmbeddingsService] Found ${searchResults.length} results`);
+      return searchResults;
     } catch (error) {
       console.error('Semantic search failed:', error);
       throw error;
@@ -299,9 +356,6 @@ export class EmbeddingsService {
     return syncedCount;
   }
 
-  /**
-   * Get the current index status
-   */
   getIndexStatus(): IndexStatus {
     const nodes = this.graphRAG.getNodes();
     const edges = this.graphRAG.getEdges();
@@ -315,17 +369,11 @@ export class EmbeddingsService {
     };
   }
 
-  /**
-   * Clear all data
-   */
   clear(): void {
     this.graphRAG.clear();
     this.hnswAdapter.clear();
   }
 
-  /**
-   * Cleanup resources
-   */
   dispose(): void {
     if (this.currentProvider) {
       this.currentProvider.dispose();

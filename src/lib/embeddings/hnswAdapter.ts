@@ -1,4 +1,3 @@
-
 import { HNSW } from './HNSW';
 import { SimilarityIndex } from './graphrag';
 
@@ -15,14 +14,16 @@ export class HNSWAdapter implements SimilarityIndex {
   constructor(dimension: number = 384, M: number = 16, efConstruction: number = 200) {
     this.dimension = dimension;
     this.hnsw = new HNSW(M, efConstruction, 'cosine');
+    console.log(`[HNSWAdapter] Initialized with ${dimension}D`);
   }
 
   updateDimension(newDimension: number): void {
     if (this.hnsw.nodes.size > 0) {
-      console.warn('Updating dimension on non-empty HNSW index. Clearing existing data.');
+      console.warn(`[HNSWAdapter] Updating dimension on non-empty HNSW index from ${this.dimension}D to ${newDimension}D. Clearing existing data.`);
       this.clear();
     }
     this.dimension = newDimension;
+    console.log(`[HNSWAdapter] Dimension updated to ${newDimension}D`);
   }
 
   getDimension(): number {
@@ -33,7 +34,7 @@ export class HNSWAdapter implements SimilarityIndex {
     for (const item of items) {
       // Validate dimension
       if (item.embedding.length !== this.dimension) {
-        console.warn(`Embedding dimension mismatch: expected ${this.dimension}, got ${item.embedding.length}`);
+        console.warn(`[HNSWAdapter] Embedding dimension mismatch: expected ${this.dimension}, got ${item.embedding.length} for item ${item.id}`);
         continue;
       }
 
@@ -49,8 +50,9 @@ export class HNSWAdapter implements SimilarityIndex {
         this.hnsw.addPoint(numericId, new Float32Array(item.embedding));
       } catch (error) {
         if (error.message.includes('already exists')) {
-          console.warn(`Point ${item.id} (${numericId}) already exists in HNSW, skipping...`);
+          console.warn(`[HNSWAdapter] Point ${item.id} (${numericId}) already exists in HNSW, skipping...`);
         } else {
+          console.error(`[HNSWAdapter] Failed to add point ${item.id}:`, error);
           throw error;
         }
       }
@@ -62,6 +64,12 @@ export class HNSWAdapter implements SimilarityIndex {
       return [];
     }
 
+    // Validate query embedding dimension
+    if (queryEmbedding.length !== this.dimension) {
+      console.warn(`[HNSWAdapter] Query embedding dimension mismatch: expected ${this.dimension}, got ${queryEmbedding.length}`);
+      return [];
+    }
+
     try {
       const results = this.hnsw.searchKNN(new Float32Array(queryEmbedding), k);
       
@@ -70,7 +78,7 @@ export class HNSWAdapter implements SimilarityIndex {
         distance: 1 - result.score // Convert similarity back to distance (GraphRAG expects distance)
       })).filter(result => result.id !== undefined);
     } catch (error) {
-      console.error('HNSW search failed:', error);
+      console.error('[HNSWAdapter] Search failed:', error);
       return [];
     }
   }

@@ -55,14 +55,17 @@ export class GraphRAG {
 
     // Register a default 'semantic' edge type
     this.defineEdgeType('semantic', { symmetrical: true });
+
+    console.log(`[GraphRAG] Initialized with ${dimension}D`);
   }
 
   // Add method to update dimensions
   updateDimension(newDimension: number): void {
     if (this.nodes.size > 0) {
-      console.warn('Updating dimension on non-empty graph. Existing embeddings may be incompatible.');
+      console.warn(`[GraphRAG] Updating dimension on non-empty graph from ${this.dimension}D to ${newDimension}D. Existing embeddings may be incompatible.`);
     }
     this.dimension = newDimension;
+    console.log(`[GraphRAG] Dimension updated to ${newDimension}D`);
   }
 
   getDimension(): number {
@@ -88,7 +91,7 @@ export class GraphRAG {
   // Add a node to the graph
   addNode(node: GraphNode): void {
     if (node.embedding && node.embedding.length !== this.dimension) {
-      throw new Error(`Embedding dimension must be ${this.dimension}`);
+      throw new Error(`Embedding dimension must be ${this.dimension}, got ${node.embedding.length}`);
     }
     this.nodes.set(node.id, node);
   }
@@ -313,7 +316,7 @@ export class GraphRAG {
 
     if (queryEmbedding) {
       if (queryEmbedding.length !== this.dimension) {
-        throw new Error(`Query embedding must have dimension ${this.dimension}`);
+        throw new Error(`Query embedding must have dimension ${this.dimension}, got ${queryEmbedding.length}`);
       }
       // Find initial candidate set via dense search
       const candidateScores: Array<[string, number]> = Array.from(this.nodes.values())
