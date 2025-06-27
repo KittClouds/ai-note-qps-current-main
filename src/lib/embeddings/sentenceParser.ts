@@ -1,30 +1,14 @@
 
 /*
- * Browser‑friendly sentence splitter powered by Wink NLP
+ * Browser‑friendly sentence splitter powered by Compromise
  * --------------------------------------------------------
- * Drop‑in replacement for the previous Compromise implementation.  
- * – Zero additional dependencies – reuses existing Wink NLP infrastructure.
+ * Drop‑in replacement for the previous regex workaround.  
+ * – Zero Node dependencies – works inside a Web Worker or main thread.
  * – Adds optional custom abbreviations at runtime.
  * – Exposes the same async API your chunker expects.
  */
 
-// @ts-ignore - We'll handle the import dynamically
-let winkNLP: any = null;
-let model: any = null;
-
-// Dynamic import to handle potential loading issues
-async function loadWinkNLP() {
-  try {
-    const winkModule = await import('wink-nlp');
-    const modelModule = await import('wink-eng-lite-web-model');
-    winkNLP = winkModule.default || winkModule;
-    model = modelModule.default || modelModule;
-    return true;
-  } catch (error) {
-    console.warn('Failed to load wink-nlp modules:', error);
-    return false;
-  }
-}
+import nlp from 'compromise';
 
 export interface SentenceParseOptions {
   /**
@@ -34,8 +18,38 @@ export interface SentenceParseOptions {
   abbreviations?: string[];
 }
 
+// Track abbreviations we have already injected – avoids duplicate plugins
+const injectedAbbr: Set<string> = new Set();
+
 /**
- * Split text into sentences using Wink NLP.
+ * Inject user‑supplied abbreviations into Compromise's world model.
+ * This runs once per new abbreviation and costs ~1 µs.
+ */
+function ensureAbbreviations(abbrs: string[]): void {
+  const fresh = abbrs.filter(a => !injectedAbbr.has(a));
+  if (fresh.length === 0) return;
+
+  // Create a proper plugin object for Compromise
+  const abbreviationPlugin = {
+    words: {},
+    tags: {},
+    // Plugin initialization function
+    init: (Doc: any, world: any) => {
+      fresh.forEach(a => {
+        if (world.model && world.model.one && world.model.one.abbreviations) {
+          world.model.one.abbreviations.push(a);
+        }
+      });
+    }
+  };
+
+  // Extend the global instance with proper plugin structure
+  nlp.extend(abbreviationPlugin);
+  fresh.forEach(a => injectedAbbr.add(a));
+}
+
+/**
+ * Split text into sentences using Compromise.
  * Returns an array of trimmed sentence strings.
  */
 export async function parseSentences(
@@ -44,41 +58,14 @@ export async function parseSentences(
 ): Promise<string[]> {
   if (!text || typeof text !== 'string') return [];
 
-  // Ensure Wink NLP is loaded
-  const loaded = await loadWinkNLP();
-  if (!loaded || !winkNLP || !model) {
-    console.warn('Wink NLP not available, falling back to simple parsing');
-    return simpleParseSentences(text);
+  // Optionally enrich the abbreviation list
+  if (options.abbreviations && options.abbreviations.length) {
+    ensureAbbreviations(options.abbreviations);
   }
 
-  try {
-    // Pre-process abbreviations by masking periods
-    let processedText = text;
-    if (options.abbreviations && options.abbreviations.length) {
-      for (const abbr of options.abbreviations) {
-        // Replace periods in abbreviations with placeholder character
-        const safe = abbr.replace(/\./g, '¶');
-        const regex = new RegExp(`\\b${abbr.replace(/\./g, '\\.')}\\.`, 'g');
-        processedText = processedText.replace(regex, `${safe}.`);
-      }
-    }
-
-    // Initialize Wink NLP with tokenization and sentence boundary detection
-    const nlp = winkNLP(model, ['tokenization', 'sbd']);
-    const doc = nlp.readDoc(processedText);
-    
-    // Extract sentences
-    const sentences = doc.sentences().out();
-    
-    // Post-process: restore periods and clean up
-    return sentences
-      .map(s => s.replace(/¶/g, '.').trim())
-      .filter(Boolean);
-      
-  } catch (error) {
-    console.warn('Wink NLP sentence parsing failed, falling back to simple parsing:', error);
-    return simpleParseSentences(text);
-  }
+  // Tokenise & extract sentences
+  const sentences = nlp(text).sentences().out('array') as string[];
+  return sentences.map(s => s.trim()).filter(Boolean);
 }
 
 /**

@@ -1,40 +1,5 @@
 
 // Enhanced utility functions to extract plain text from TipTap JSON documents
-// Now powered by Wink NLP for better NER preprocessing
-
-// @ts-ignore - We'll handle the import dynamically
-let winkNLP: any = null;
-let model: any = null;
-let winkUtils: any = null;
-
-// Dynamic import to handle potential loading issues
-async function loadWinkNLP() {
-  try {
-    const winkModule = await import('wink-nlp');
-    const modelModule = await import('wink-eng-lite-web-model');
-    const utilsModule = await import('wink-nlp-utils');
-    
-    winkNLP = winkModule.default || winkModule;
-    model = modelModule.default || modelModule;
-    winkUtils = utilsModule;
-    return true;
-  } catch (error) {
-    console.warn('Failed to load wink-nlp modules:', error);
-    return false;
-  }
-}
-
-// Initialize Wink NLP instance
-let nlpInstance: any = null;
-async function getWinkInstance() {
-  if (!nlpInstance) {
-    const loaded = await loadWinkNLP();
-    if (loaded && winkNLP && model) {
-      nlpInstance = winkNLP(model, ['tokenization', 'sbd', 'negation', 'sentiment']);
-    }
-  }
-  return nlpInstance;
-}
 
 /**
  * Extract text from a single TipTap JSON node recursively
@@ -123,152 +88,9 @@ export function extractTextFromNoteContent(content: any): string {
 }
 
 /**
- * NER-specific text preparation using Wink NLP
+ * Validate if text is suitable for NER analysis
  */
-export interface NERTextPreparation {
-  cleanText: string;
-  entityHints: Array<{ value: string; type: string; start: number; end: number }>;
-  sentences: string[];
-  tokens: string[];
-  metadata: {
-    wordCount: number;
-    sentenceCount: number;
-    hasProperNouns: boolean;
-    confidence: number;
-  };
-}
-
-/**
- * Prepare text specifically for NER analysis using Wink NLP
- */
-export async function prepareTextForNER(text: string): Promise<NERTextPreparation> {
-  const nlp = await getWinkInstance();
-  
-  if (!nlp || !text?.trim()) {
-    return {
-      cleanText: text || '',
-      entityHints: [],
-      sentences: text ? [text.trim()] : [],
-      tokens: [],
-      metadata: {
-        wordCount: 0,
-        sentenceCount: 0,
-        hasProperNouns: false,
-        confidence: 0
-      }
-    };
-  }
-
-  try {
-    // Initial cleaning using Wink utilities
-    let cleanedText = text;
-    if (winkUtils) {
-      if (winkUtils.string?.removeHTMLTags) {
-        cleanedText = winkUtils.string.removeHTMLTags(cleanedText);
-      }
-      if (winkUtils.string?.removeDiacritics) {
-        cleanedText = winkUtils.string.removeDiacritics(cleanedText);
-      }
-    }
-
-    // Process with Wink NLP
-    const doc = nlp.readDoc(cleanedText);
-    const its = nlp.its;
-
-    // Extract sentences
-    const sentences = doc.sentences().out();
-
-    // Extract meaningful tokens (filtered)
-    const tokens = doc.tokens()
-      .filter((token: any) => {
-        return !token.out(its.stopWordFlag) && 
-               token.out(its.type) !== 'punctuation' &&
-               token.out().length > 1;
-      })
-      .out();
-
-    // Extract entity hints from Wink's basic entity recognition
-    const entityHints: Array<{ value: string; type: string; start: number; end: number }> = [];
-    
-    // Get entities if available
-    try {
-      doc.entities().each((entity: any) => {
-        const value = entity.out();
-        const type = entity.out(its.type) || 'UNKNOWN';
-        const detail = entity.out(its.detail);
-        
-        if (value && value.length > 1) {
-          entityHints.push({
-            value,
-            type: type.toUpperCase(),
-            start: detail?.start || 0,
-            end: detail?.end || value.length
-          });
-        }
-      });
-    } catch (error) {
-      console.warn('[NER] Wink entity extraction failed:', error);
-    }
-
-    // Calculate metadata
-    const wordCount = tokens.length;
-    const sentenceCount = sentences.length;
-    
-    // Check for proper nouns (capitalized words not at sentence start)
-    const hasProperNouns = doc.tokens()
-      .filter((token: any) => {
-        const pos = token.out(its.pos);
-        return pos === 'NNP' || pos === 'NNPS'; // Proper noun tags
-      })
-      .length > 0;
-
-    // Calculate confidence based on text quality
-    let confidence = 0.5; // Base confidence
-    if (wordCount >= 5) confidence += 0.2;
-    if (sentenceCount >= 2) confidence += 0.1;
-    if (hasProperNouns) confidence += 0.2;
-    confidence = Math.min(confidence, 1.0);
-
-    return {
-      cleanText: cleanedText.trim(),
-      entityHints,
-      sentences,
-      tokens,
-      metadata: {
-        wordCount,
-        sentenceCount,
-        hasProperNouns,
-        confidence
-      }
-    };
-
-  } catch (error) {
-    console.error('[NER] Wink text preparation failed:', error);
-    return {
-      cleanText: text.trim(),
-      entityHints: [],
-      sentences: [text.trim()],
-      tokens: text.split(/\s+/).filter(Boolean),
-      metadata: {
-        wordCount: text.split(/\s+/).length,
-        sentenceCount: 1,
-        hasProperNouns: false,
-        confidence: 0.3
-      }
-    };
-  }
-}
-
-/**
- * Enhanced validation using Wink NLP linguistic analysis
- */
-export async function validateTextForNER(text: string): Promise<{ 
-  isValid: boolean; 
-  reason?: string; 
-  wordCount?: number;
-  confidence?: number;
-  suggestions?: string[];
-}> {
+export function validateTextForNER(text: string): { isValid: boolean; reason?: string; wordCount?: number } {
   if (!text || typeof text !== 'string') {
     return { isValid: false, reason: 'No text provided' };
   }
@@ -281,49 +103,41 @@ export async function validateTextForNER(text: string): Promise<{
   if (trimmed.length < 10) {
     return { isValid: false, reason: 'Text too short (minimum 10 characters)' };
   }
-
-  // Use Wink NLP for better validation
-  const preparation = await prepareTextForNER(trimmed);
-  const { wordCount, confidence } = preparation.metadata;
+  
+  const words = trimmed.split(/\s+/).filter(word => word.length > 0);
+  const wordCount = words.length;
   
   if (wordCount < 3) {
-    return { 
-      isValid: false, 
-      reason: 'Not enough meaningful words (minimum 3 words)', 
-      wordCount,
-      confidence,
-      suggestions: ['Add more descriptive text', 'Include proper nouns or entities']
-    };
+    return { isValid: false, reason: 'Not enough words (minimum 3 words)', wordCount };
   }
   
-  if (confidence < 0.4) {
-    return { 
-      isValid: false, 
-      reason: 'Text quality too low for reliable NER', 
-      wordCount,
-      confidence,
-      suggestions: [
-        'Add more complete sentences',
-        'Include proper nouns and entities',
-        'Reduce special characters and formatting'
-      ]
-    };
+  // Check if text contains mostly special characters or numbers
+  const alphaCount = (trimmed.match(/[a-zA-Z]/g) || []).length;
+  const alphaRatio = alphaCount / trimmed.length;
+  
+  if (alphaRatio < 0.5) {
+    return { isValid: false, reason: 'Text contains too few alphabetic characters', wordCount };
   }
   
-  return { 
-    isValid: true, 
-    wordCount,
-    confidence,
-    suggestions: confidence < 0.7 ? ['Consider adding more context for better results'] : undefined
-  };
+  return { isValid: true, wordCount };
 }
 
 /**
- * Enhanced preprocessing using Wink NLP
+ * Preprocess text for better NER performance
  */
-export async function preprocessTextForNER(text: string): Promise<string> {
+export function preprocessTextForNER(text: string): string {
   if (!text) return '';
   
-  const preparation = await prepareTextForNER(text);
-  return preparation.cleanText;
+  return text
+    // Normalize whitespace
+    .replace(/\s+/g, ' ')
+    // Remove excessive punctuation
+    .replace(/[.]{3,}/g, '...')
+    .replace(/[!]{2,}/g, '!')
+    .replace(/[?]{2,}/g, '?')
+    // Clean up common formatting artifacts
+    .replace(/\u00A0/g, ' ') // Non-breaking space
+    .replace(/\u2009/g, ' ') // Thin space
+    .replace(/\u200B/g, '') // Zero-width space
+    .trim();
 }

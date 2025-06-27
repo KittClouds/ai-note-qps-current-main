@@ -22,11 +22,6 @@ export const SearchCommand = Extension.create({
         if (!query.trim()) return [];
         
         try {
-          // Ensure embeddings service is initialized
-          if (!embeddingsService.getCurrentProvider()) {
-            await embeddingsService.initialize();
-          }
-          
           const results = await embeddingsService.search(query, 5);
           return results.map(result => ({
             id: result.noteId,

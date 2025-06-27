@@ -3,8 +3,6 @@ import { HNSWAdapter } from './hnswAdapter';
 import { createNoteChunks, TextChunk, preprocessText } from './textProcessing';
 import { createNoteChunksSemantic } from './textProcessing';
 import { SemanticChunkingOptions } from './semanticChunkingConfig';
-import { providerRegistry } from './providers/ProviderRegistry';
-import { EmbeddingProvider } from './providers/EmbeddingProvider';
 
 export interface EmbeddingWorkerMessage {
   source: string;
@@ -35,33 +33,59 @@ export interface IndexStatus {
 }
 
 export class EmbeddingsService {
+  private worker: Worker | null = null;
   private graphRAG: GraphRAG;
   private hnswAdapter: HNSWAdapter;
   private isInitialized = false;
+  private pendingRequests = new Map<string, { resolve: Function; reject: Function }>();
+  private requestId = 0;
   private noteMetadata = new Map<string, { title: string; noteId: string }>();
-  private currentProvider: EmbeddingProvider | null = null;
 
   constructor() {
-    // Initialize with default dimensions - will be updated when provider is set
-    this.graphRAG = new GraphRAG(384);
+    this.graphRAG = new GraphRAG(384); // 384-dimensional embeddings
     this.hnswAdapter = new HNSWAdapter(384);
   }
 
+  /**
+   * Initialize the embeddings service and worker
+   */
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
 
     try {
-      // Initialize provider registry
-      await providerRegistry.initializeFromStorage();
-      this.currentProvider = providerRegistry.getActiveProvider();
-      
-      if (!this.currentProvider) {
-        throw new Error('No embedding provider available');
-      }
+      // Create the worker
+      this.worker = new Worker(
+        new URL('./embeddingsWorker.ts', import.meta.url),
+        { type: 'module' }
+      );
 
-      // Update dimensions based on active provider
-      this.updateDimensions(this.currentProvider.dimension);
-      
+      // Set up worker message handling
+      this.worker.onmessage = (event) => {
+        const { status, embeddings, error } = event.data;
+        
+        if (status === 'complete' || status === 'error') {
+          // Handle responses to specific requests
+          const requestKey = `${this.requestId - 1}`;
+          const pendingRequest = this.pendingRequests.get(requestKey);
+          
+          if (pendingRequest) {
+            if (status === 'complete') {
+              pendingRequest.resolve(embeddings);
+            } else {
+              pendingRequest.reject(new Error(error));
+            }
+            this.pendingRequests.delete(requestKey);
+          }
+        } else {
+          // Handle progress updates
+          console.log('Embeddings model loading progress:', event.data);
+        }
+      };
+
+      this.worker.onerror = (error) => {
+        console.error('Embeddings worker error:', error);
+      };
+
       this.isInitialized = true;
     } catch (error) {
       console.error('Failed to initialize embeddings service:', error);
@@ -69,49 +93,25 @@ export class EmbeddingsService {
     }
   }
 
-  async switchProvider(providerId: string, apiKey?: string): Promise<void> {
-    try {
-      // Set API key for Gemini if provided
-      if (providerId === 'gemini' && apiKey) {
-        const geminiProvider = providerRegistry.getProvider('gemini') as any;
-        if (geminiProvider && geminiProvider.setApiKey) {
-          geminiProvider.setApiKey(apiKey);
-        }
-      }
-
-      await providerRegistry.setActiveProvider(providerId);
-      this.currentProvider = providerRegistry.getActiveProvider();
-      
-      if (this.currentProvider) {
-        this.updateDimensions(this.currentProvider.dimension);
-        console.log(`Switched to ${this.currentProvider.name} (${this.currentProvider.dimension}D)`);
-      }
-    } catch (error) {
-      console.error('Failed to switch provider:', error);
-      throw error;
-    }
-  }
-
-  private updateDimensions(dimension: number): void {
-    // Clear existing data when switching dimensions
-    this.clear();
-    
-    // Recreate components with new dimensions
-    this.graphRAG = new GraphRAG(dimension);
-    this.hnswAdapter = new HNSWAdapter(dimension);
-  }
-
-  getCurrentProvider(): EmbeddingProvider | null {
-    return this.currentProvider;
-  }
-
+  /**
+   * Generate embeddings for text using the worker
+   */
   private async generateEmbeddings(text: string | string[], isQuery = false): Promise<number[][]> {
-    if (!this.currentProvider) {
-      throw new Error('No embedding provider initialized');
+    if (!this.worker) {
+      throw new Error('Embeddings service not initialized');
     }
 
-    const texts = Array.isArray(text) ? text : [text];
-    return await this.currentProvider.generateEmbeddings(texts, { isQuery });
+    const requestKey = `${this.requestId++}`;
+    
+    return new Promise((resolve, reject) => {
+      this.pendingRequests.set(requestKey, { resolve, reject });
+      
+      this.worker!.postMessage({
+        source: Array.isArray(text) ? text.join(' ') : text,
+        text: text,
+        isQuery
+      });
+    });
   }
 
   /**
@@ -327,8 +327,9 @@ export class EmbeddingsService {
    * Cleanup resources
    */
   dispose(): void {
-    if (this.currentProvider) {
-      this.currentProvider.dispose();
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
     }
     this.clear();
     this.isInitialized = false;

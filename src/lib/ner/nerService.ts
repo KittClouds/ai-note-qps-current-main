@@ -43,26 +43,18 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
 type CandidateLabels = string[];
 type DeviceType = 'webgpu' | 'wasm' | 'cpu';
 
-// Default entity labels for NeuroBERT
+// Default entity labels for GLiNER
 const DEFAULT_LABELS: CandidateLabels = [
   'PERSON',
-  'CARDINAL',
+  'ORGANIZATION', 
+  'LOCATION',
   'DATE',
-  'EVENT',
-  'FAC',
-  'GPE',
-  'LANGUAGE',
-  'LAW',
-  'LOC',
   'MONEY',
-  'NORP',
-  'ORDINAL',
-  'ORG',
-  'PERCENT',
   'PRODUCT',
-  'QUANTITY',
-  'TIME',
-  'WORK_OF_ART'
+  'EVENT',
+  'WORK_OF_ART',
+  'LAW',
+  'LANGUAGE'
 ];
 
 /**
@@ -219,8 +211,12 @@ class NERService {
     try {
       console.log('[NER] Running inference...');
       
-      // NeuroBERT uses standard token classification input
-      const raw = await this.classifier(text);
+      // For standard NER models, we don't need the labels parameter
+      const inferenceInput = this.currentModelId.includes('gliner') 
+        ? { text, labels } // GLiNER-style input
+        : text; // Standard token classification input
+      
+      const raw = await this.classifier(inferenceInput);
       console.log('[NER] Raw inference result:', raw);
 
       const entities: NEREntity[] = [];
@@ -228,7 +224,7 @@ class NERService {
 
       if (Array.isArray(raw)) {
         for (const r of raw) {
-          // Handle NeuroBERT output format
+          // Handle different model output formats
           const entity: NEREntity = {
             value: r.word || r.entity_group || r.text || '',
             type: r.entity || r.entity_group || r.label || 'UNKNOWN',

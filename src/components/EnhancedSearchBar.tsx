@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Search, Loader2, Zap, Database, FileText, Blend } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,6 @@ import { bm25Service, BM25SearchResult } from '@/lib/bm25/bm25Service';
 import { hybridSearchService, HybridSearchResult } from '@/lib/search/hybridSearchService';
 import { Note } from '@/types/notes';
 import { useToast } from '@/hooks/use-toast';
-import { EmbeddingProviderButton } from './EmbeddingProviderButton';
 
 interface EnhancedSearchBarProps {
   searchQuery: string;
@@ -286,10 +286,6 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
 
       {searchMode === 'semantic' && (
         <div className="space-y-3 mb-3">
-          <div className="flex items-center justify-between">
-            <EmbeddingProviderButton />
-          </div>
-          
           <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
             <div className="flex items-center space-x-2">
               <Zap className="h-4 w-4 text-primary" />
