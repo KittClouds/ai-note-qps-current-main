@@ -1,7 +1,32 @@
-import { nerService as huggingFaceService, NEREntity, NERResult, NERStatus, ModelInfo, AVAILABLE_MODELS } from './nerService';
+
+import { geminiNERProvider, GEMINI_NER_MODELS, GeminiModelInfo } from './providers/GeminiNERProvider';
 import { winkNERService, WinkNEREntity, WinkNERResult, WinkNERStatus } from './winkService';
 
-export type NERProvider = 'huggingface' | 'wink';
+export interface NEREntity {
+  value: string;
+  type: string;
+  start: number;
+  end: number;
+  confidence?: number;
+}
+
+export interface NERResult {
+  entities: NEREntity[];
+  totalCount: number;
+  entityTypes: Record<string, number>;
+  processingTime?: number;
+  textLength?: number;
+}
+
+export interface NERStatus {
+  isInitialized: boolean;
+  isLoading: boolean;
+  hasError: boolean;
+  errorMessage?: string;
+  modelId?: string;
+}
+
+export type NERProvider = 'gemini' | 'wink';
 
 export interface UnifiedModelInfo {
   id: string;
@@ -10,13 +35,13 @@ export interface UnifiedModelInfo {
   provider: NERProvider;
 }
 
-// Simplified model list with only SmolLM2 and Wink
+// Unified model list with Gemini and Wink
 export const AVAILABLE_NER_MODELS: UnifiedModelInfo[] = [
-  // HuggingFace SmolLM2 model
-  ...AVAILABLE_MODELS.map(model => ({
+  // Gemini models
+  ...GEMINI_NER_MODELS.map(model => ({
     ...model,
-    name: `${model.name} (HuggingFace)`,
-    provider: 'huggingface' as NERProvider
+    name: `${model.name} (Gemini)`,
+    provider: 'gemini' as NERProvider
   })),
   // Wink model
   {
@@ -46,14 +71,14 @@ export interface UnifiedNERStatus {
 }
 
 /**
- * NER Service Manager - Handles switching between HuggingFace SmolLM2 and Wink services
+ * NER Service Manager - Handles switching between Gemini and Wink services
  */
 class NERServiceManager {
-  private currentProvider: NERProvider = 'huggingface';
-  private currentModelId: string = AVAILABLE_MODELS[0].id;
+  private currentProvider: NERProvider = 'gemini';
+  private currentModelId: string = GEMINI_NER_MODELS[0].id;
 
   constructor() {
-    console.log('[NERManager] Service manager initialized with SmolLM2 and Wink');
+    console.log('[NERManager] Service manager initialized with Gemini and Wink');
   }
 
   /**
@@ -87,8 +112,8 @@ class NERServiceManager {
     this.currentModelId = modelId;
 
     // Switch to the appropriate service
-    if (this.currentProvider === 'huggingface') {
-      await huggingFaceService.switchModel(modelId);
+    if (this.currentProvider === 'gemini') {
+      await geminiNERProvider.switchModel(modelId);
     } else if (this.currentProvider === 'wink') {
       // Wink only has one model, so just ensure it's initialized
       if (!winkNERService.isInitialized() && !winkNERService.isLoading()) {
@@ -101,11 +126,11 @@ class NERServiceManager {
    * Extract entities using the current provider
    */
   public async extractEntities(text: string): Promise<UnifiedNERResult> {
-    if (this.currentProvider === 'huggingface') {
-      const result = await huggingFaceService.extractEntities(text);
+    if (this.currentProvider === 'gemini') {
+      const result = await geminiNERProvider.extractEntities(text);
       return {
         ...result,
-        provider: 'huggingface'
+        provider: 'gemini'
       };
     } else if (this.currentProvider === 'wink') {
       const result = await winkNERService.extractEntities(text);
@@ -122,11 +147,11 @@ class NERServiceManager {
    * Get unified status from current provider
    */
   public getStatus(): UnifiedNERStatus {
-    if (this.currentProvider === 'huggingface') {
-      const status = huggingFaceService.getStatus();
+    if (this.currentProvider === 'gemini') {
+      const status = geminiNERProvider.getStatus();
       return {
         ...status,
-        provider: 'huggingface'
+        provider: 'gemini'
       };
     } else if (this.currentProvider === 'wink') {
       const status = winkNERService.getStatus();
@@ -151,8 +176,8 @@ class NERServiceManager {
   public async reinitialize(): Promise<void> {
     console.log('[NERManager] Reinitializing current provider:', this.currentProvider);
     
-    if (this.currentProvider === 'huggingface') {
-      await huggingFaceService.reinitialize();
+    if (this.currentProvider === 'gemini') {
+      await geminiNERProvider.reinitialize();
     } else if (this.currentProvider === 'wink') {
       await winkNERService.reinitialize();
     }
@@ -169,8 +194,8 @@ class NERServiceManager {
    * Check if current service is initialized
    */
   public isInitialized(): boolean {
-    if (this.currentProvider === 'huggingface') {
-      return huggingFaceService.isInitialized();
+    if (this.currentProvider === 'gemini') {
+      return geminiNERProvider.isInitialized();
     } else if (this.currentProvider === 'wink') {
       return winkNERService.isInitialized();
     }
@@ -181,8 +206,8 @@ class NERServiceManager {
    * Check if current service is loading
    */
   public isLoading(): boolean {
-    if (this.currentProvider === 'huggingface') {
-      return huggingFaceService.isLoading();
+    if (this.currentProvider === 'gemini') {
+      return geminiNERProvider.isLoading();
     } else if (this.currentProvider === 'wink') {
       return winkNERService.isLoading();
     }
@@ -193,8 +218,8 @@ class NERServiceManager {
    * Check if current service has errors
    */
   public hasErrors(): boolean {
-    if (this.currentProvider === 'huggingface') {
-      return huggingFaceService.hasErrors();
+    if (this.currentProvider === 'gemini') {
+      return geminiNERProvider.hasErrors();
     } else if (this.currentProvider === 'wink') {
       return winkNERService.hasErrors();
     }
