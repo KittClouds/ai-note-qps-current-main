@@ -26,6 +26,16 @@ export const GEMINI_NER_MODELS: GeminiModelInfo[] = [
     id: 'gemini-2.5-flash-lite-preview-06-17',
     name: 'Gemini 2.5 Flash Lite',
     description: 'Lightweight version for faster processing'
+  },
+  {
+    id: 'gemma-3n-e4b-it',
+    name: 'Gemma 3N E4B IT',
+    description: 'Advanced Gemma model for NER tasks'
+  },
+  {
+    id: 'gemma-3-27b-it',
+    name: 'Gemma 3 27B IT',
+    description: 'Large Gemma model for high-precision NER'
   }
 ];
 
@@ -105,13 +115,43 @@ export class GeminiNERProvider {
 Text: "${text}"
 
 Extract entities of these types:
-- PERSON: Names of people
-- ORGANIZATION: Companies, institutions, organizations
-- LOCATION: Cities, countries, places
-- DATE: Dates and times
-- MONEY: Monetary amounts
-- PERCENTAGE: Percentages
-- MISC: Other important entities
+- O: Outside of any named entity (e.g., "the", "is")
+- B-CARDINAL: Beginning of a cardinal number (e.g., "1000")
+- B-DATE: Beginning of a date (e.g., "January")
+- B-EVENT: Beginning of an event (e.g., "Olympics")
+- B-FAC: Beginning of a facility (e.g., "Eiffel Tower")
+- B-GPE: Beginning of a geopolitical entity (e.g., "Tokyo")
+- B-LANGUAGE: Beginning of a language (e.g., "Spanish")
+- B-LAW: Beginning of a law or legal document (e.g., "Constitution")
+- B-LOC: Beginning of a non-GPE location (e.g., "Pacific Ocean")
+- B-MONEY: Beginning of a monetary value (e.g., "$100")
+- B-NORP: Beginning of a nationality/religious/political group (e.g., "Democrat")
+- B-ORDINAL: Beginning of an ordinal number (e.g., "first")
+- B-ORG: Beginning of an organization (e.g., "Microsoft")
+- B-PERCENT: Beginning of a percentage (e.g., "50%")
+- B-PERSON: Beginning of a person's name (e.g., "Elon Musk")
+- B-PRODUCT: Beginning of a product (e.g., "iPhone")
+- B-QUANTITY: Beginning of a quantity (e.g., "two liters")
+- B-TIME: Beginning of a time (e.g., "noon")
+- B-WORK_OF_ART: Beginning of a work of art (e.g., "Mona Lisa")
+- I-CARDINAL: Inside of a cardinal number (e.g., "000" in "1000")
+- I-DATE: Inside of a date (e.g., "2025" in "January 2025")
+- I-EVENT: Inside of an event name
+- I-FAC: Inside of a facility name
+- I-GPE: Inside of a geopolitical entity
+- I-LANGUAGE: Inside of a language name
+- I-LAW: Inside of a legal document title
+- I-LOC: Inside of a location
+- I-MONEY: Inside of a monetary value
+- I-NORP: Inside of a NORP entity
+- I-ORDINAL: Inside of an ordinal number
+- I-ORG: Inside of an organization name
+- I-PERCENT: Inside of a percentage
+- I-PERSON: Inside of a person's name
+- I-PRODUCT: Inside of a product name
+- I-QUANTITY: Inside of a quantity
+- I-TIME: Inside of a time phrase
+- I-WORK_OF_ART: Inside of a work of art title
 
 For each entity, provide:
 - value: the exact text as it appears
@@ -157,18 +197,21 @@ For each entity, provide:
       const data: GeminiNERResponse = await response.json();
       const entities = this.parseEntitiesFromResponse(data, text);
       
-      const entityTypes = entities.reduce((acc, entity) => {
+      // Remove duplicates based on value, type, start, and end positions
+      const uniqueEntities = this.removeDuplicateEntities(entities);
+      
+      const entityTypes = uniqueEntities.reduce((acc, entity) => {
         acc[entity.type] = (acc[entity.type] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
 
       const processingTime = Date.now() - startTime;
       console.log(`[GeminiNER] Analysis completed in ${processingTime}ms`);
-      console.log(`[GeminiNER] Found ${entities.length} entities:`, entities);
+      console.log(`[GeminiNER] Found ${uniqueEntities.length} unique entities:`, uniqueEntities);
 
       return {
-        entities,
-        totalCount: entities.length,
+        entities: uniqueEntities,
+        totalCount: uniqueEntities.length,
         entityTypes,
         processingTime,
         textLength: text.length
@@ -225,6 +268,19 @@ For each entity, provide:
       console.error('[GeminiNER] Failed to parse response:', error);
       return [];
     }
+  }
+
+  private removeDuplicateEntities(entities: NEREntity[]): NEREntity[] {
+    const seen = new Set<string>();
+    return entities.filter(entity => {
+      const key = `${entity.value}-${entity.type}-${entity.start}-${entity.end}`;
+      if (seen.has(key)) {
+        console.log('[GeminiNER] Removing duplicate entity:', entity);
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
   }
 
   public async switchModel(modelId: string): Promise<void> {
