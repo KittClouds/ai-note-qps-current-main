@@ -1,4 +1,3 @@
-
 import { nerService as huggingFaceService, NEREntity, NERResult, NERStatus, ModelInfo, AVAILABLE_MODELS } from './nerService';
 import { winkNERService, WinkNEREntity, WinkNERResult, WinkNERStatus } from './winkService';
 
@@ -11,15 +10,15 @@ export interface UnifiedModelInfo {
   provider: NERProvider;
 }
 
-// Extended model list with both providers
+// Simplified model list with only SmolLM2 and Wink
 export const AVAILABLE_NER_MODELS: UnifiedModelInfo[] = [
-  // HuggingFace models
+  // HuggingFace SmolLM2 model
   ...AVAILABLE_MODELS.map(model => ({
     ...model,
     name: `${model.name} (HuggingFace)`,
     provider: 'huggingface' as NERProvider
   })),
-  // Wink models
+  // Wink model
   {
     id: 'wink-eng-lite-web-model',
     name: 'Wink NLP Basic (Wink)',
@@ -47,14 +46,14 @@ export interface UnifiedNERStatus {
 }
 
 /**
- * NER Service Manager - Handles switching between HuggingFace and Wink services
+ * NER Service Manager - Handles switching between HuggingFace SmolLM2 and Wink services
  */
 class NERServiceManager {
   private currentProvider: NERProvider = 'huggingface';
   private currentModelId: string = AVAILABLE_MODELS[0].id;
 
   constructor() {
-    console.log('[NERManager] Service manager initialized');
+    console.log('[NERManager] Service manager initialized with SmolLM2 and Wink');
   }
 
   /**

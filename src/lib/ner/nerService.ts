@@ -1,12 +1,12 @@
-import { pipeline, env } from '@huggingface/transformers';
 
-// Type declarations
+import { pipeline, Pipeline } from '@huggingface/transformers';
+
 export interface NEREntity {
-  value: string;   // surface text
-  type: string;    // predicted label
-  start: number;   // char start
-  end: number;     // char end
-  confidence?: number; // confidence score
+  value: string;
+  type: string;
+  start: number;
+  end: number;
+  confidence?: number;
 }
 
 export interface NERResult {
@@ -31,87 +31,34 @@ export interface ModelInfo {
   description: string;
 }
 
-// Available models with metadata
+// Only SmolLM2 model now
 export const AVAILABLE_MODELS: ModelInfo[] = [
   {
-    id: 'onnx-community/NeuroBERT-NER-ONNX',
-    name: 'NeuroBERT NER',
-    description: 'NeuroBERT optimized for NER tasks'
+    id: 'eduardoworrel/SmolLM2-135M',
+    name: 'SmolLM2-135M',
+    description: 'Lightweight language model for text analysis'
   }
 ];
 
-type CandidateLabels = string[];
-type DeviceType = 'webgpu' | 'wasm' | 'cpu';
-
-// Default entity labels for NeuroBERT
-const DEFAULT_LABELS: CandidateLabels = [
-  'PERSON',
-  'CARDINAL',
-  'DATE',
-  'EVENT',
-  'FAC',
-  'GPE',
-  'LANGUAGE',
-  'LAW',
-  'LOC',
-  'MONEY',
-  'NORP',
-  'ORDINAL',
-  'ORG',
-  'PERCENT',
-  'PRODUCT',
-  'QUANTITY',
-  'TIME',
-  'WORK_OF_ART'
-];
-
 /**
- * Enhanced NER Service with model selection support
+ * HuggingFace Transformers NER Service
  */
 class NERService {
-  private classifier: any = null;
+  private pipeline: Pipeline | null = null;
+  private currentModelId: string = AVAILABLE_MODELS[0].id;
   private initialized = false;
   private loading = false;
   private hasError = false;
   private errorMessage = '';
-  private currentModelId = '';
-  private selectedModelId = AVAILABLE_MODELS[0].id; // Default to first model
 
   constructor() {
-    console.log('[NER] Service initialized');
+    console.log('[NERService] Service initialized with SmolLM2');
+    this.initializePipeline();
   }
 
-  private async tryInitializeModel(modelId: string, deviceOptions: DeviceType[]): Promise<boolean> {
-    for (const device of deviceOptions) {
-      try {
-        console.log(`[NER] Attempting to load model ${modelId} on device: ${device}`);
-        
-        const startTime = Date.now();
-        this.classifier = await pipeline('token-classification', modelId, { device });
-        const loadTime = Date.now() - startTime;
-        
-        console.log(`[NER] Successfully loaded model ${modelId} on ${device} in ${loadTime}ms`);
-        this.currentModelId = modelId;
-        return true;
-      } catch (err) {
-        console.warn(`[NER] Failed to load ${modelId} on ${device}:`, err);
-        continue;
-      }
-    }
-    return false;
-  }
-
-  private async init(modelId?: string) {
+  private async initializePipeline() {
     if (this.loading) {
-      console.log('[NER] Already loading');
-      return;
-    }
-    
-    const targetModelId = modelId || this.selectedModelId;
-    
-    // If we're already initialized with the same model, don't reload
-    if (this.initialized && this.currentModelId === targetModelId) {
-      console.log('[NER] Already initialized with target model');
+      console.log('[NERService] Already loading');
       return;
     }
     
@@ -121,81 +68,38 @@ class NERService {
     this.initialized = false;
 
     try {
-      console.log('[NER] Starting initialization with model:', targetModelId);
+      console.log('[NERService] Loading SmolLM2 model...');
       
-      // Configure environment for better performance
-      env.backends.onnx.wasm.numThreads = Math.min(navigator.hardwareConcurrency ?? 4, 4);
+      // Create text generation pipeline for SmolLM2
+      this.pipeline = await pipeline('text-generation', this.currentModelId, {
+        device: 'webgpu',
+        dtype: 'fp32',
+      });
       
-      // Device preference order: webgpu -> wasm -> cpu
-      const deviceOptions: DeviceType[] = ['webgpu', 'wasm', 'cpu'];
-      
-      // Try to load the specific model
-      const modelLoaded = await this.tryInitializeModel(targetModelId, deviceOptions);
-      
-      if (!modelLoaded) {
-        throw new Error(`Failed to load model: ${targetModelId}`);
-      }
-
       this.initialized = true;
-      this.selectedModelId = targetModelId;
-      console.log(`[NER] Service ready with model: ${this.currentModelId}`);
-    } catch (err) {
+      console.log('[NERService] SmolLM2 model loaded successfully');
+    } catch (error) {
       this.hasError = true;
-      this.errorMessage = err instanceof Error ? err.message : 'Unknown error during initialization';
-      console.error('[NER] Initialization failed:', err);
+      this.errorMessage = error instanceof Error ? error.message : 'Unknown error during initialization';
+      console.error('[NERService] Failed to load SmolLM2:', error);
       this.initialized = false;
     } finally {
       this.loading = false;
     }
   }
 
-  /**
-   * Switch to a different model
-   */
-  public async switchModel(modelId: string): Promise<void> {
-    console.log('[NER] Switching to model:', modelId);
-    
-    // Reset current state
-    this.classifier = null;
-    this.initialized = false;
-    this.currentModelId = '';
-    
-    // Initialize with new model
-    await this.init(modelId);
-  }
-
-  /**
-   * Get list of available models
-   */
-  public getAvailableModels(): ModelInfo[] {
-    return AVAILABLE_MODELS;
-  }
-
-  /**
-   * Get currently selected model info
-   */
-  public getCurrentModel(): ModelInfo | null {
-    return AVAILABLE_MODELS.find(model => model.id === this.currentModelId) || null;
-  }
-
-  /**
-   * Extract entities with comprehensive error handling and debugging
-   */
-  public async extractEntities(
-    text: string,
-    labels: CandidateLabels = DEFAULT_LABELS
-  ): Promise<NERResult> {
+  public async extractEntities(text: string): Promise<NERResult> {
     const startTime = Date.now();
     
-    console.log('[NER] Starting entity extraction');
-    console.log('[NER] Input text length:', text?.length || 0);
-    
+    console.log('[NERService] Starting entity extraction with SmolLM2');
+    console.log('[NERService] Input text length:', text?.length || 0);
+
     // Validate input
     if (!text?.trim()) {
-      console.warn('[NER] Empty or invalid text input');
-      return { 
-        entities: [], 
-        totalCount: 0, 
+      console.warn('[NERService] Empty or invalid text input');
+      return {
+        entities: [],
+        totalCount: 0,
         entityTypes: {},
         processingTime: Date.now() - startTime,
         textLength: 0
@@ -203,13 +107,15 @@ class NERService {
     }
 
     // Ensure model is loaded
-    await this.init();
-    
-    if (!this.initialized || !this.classifier) {
-      console.error('[NER] Service not properly initialized');
-      return { 
-        entities: [], 
-        totalCount: 0, 
+    if (!this.initialized) {
+      await this.initializePipeline();
+    }
+
+    if (!this.initialized || !this.pipeline) {
+      console.error('[NERService] SmolLM2 not properly initialized');
+      return {
+        entities: [],
+        totalCount: 0,
         entityTypes: {},
         processingTime: Date.now() - startTime,
         textLength: text.length
@@ -217,37 +123,29 @@ class NERService {
     }
 
     try {
-      console.log('[NER] Running inference...');
+      console.log('[NERService] Using SmolLM2 for text analysis...');
       
-      // NeuroBERT uses standard token classification input
-      const raw = await this.classifier(text);
-      console.log('[NER] Raw inference result:', raw);
+      // Use SmolLM2 to analyze text and extract potential entities
+      const prompt = `Analyze the following text and identify named entities (people, places, organizations, dates, etc.):\n\n${text}\n\nEntities:`;
+      
+      const result = await this.pipeline(prompt, {
+        max_new_tokens: 200,
+        temperature: 0.1,
+        do_sample: true,
+      });
 
-      const entities: NEREntity[] = [];
-      const entityTypes: Record<string, number> = {};
-
-      if (Array.isArray(raw)) {
-        for (const r of raw) {
-          // Handle NeuroBERT output format
-          const entity: NEREntity = {
-            value: r.word || r.entity_group || r.text || '',
-            type: r.entity || r.entity_group || r.label || 'UNKNOWN',
-            start: r.start || 0,
-            end: r.end || 0,
-            confidence: r.score || r.confidence
-          };
-          
-          // Filter out low-confidence or invalid entities
-          if (entity.value && entity.type && (entity.confidence || 0) > 0.5) {
-            entities.push(entity);
-            entityTypes[entity.type] = (entityTypes[entity.type] || 0) + 1;
-          }
-        }
-      }
+      // Parse the model's response to extract entities
+      // This is a simplified approach - in production you might want more sophisticated parsing
+      const entities = this.parseEntitiesFromResponse(result[0]?.generated_text || '', text);
+      
+      const entityTypes = entities.reduce((acc, entity) => {
+        acc[entity.type] = (acc[entity.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
 
       const processingTime = Date.now() - startTime;
-      console.log(`[NER] Extraction completed in ${processingTime}ms`);
-      console.log(`[NER] Found ${entities.length} entities:`, entities);
+      console.log(`[NERService] SmolLM2 analysis completed in ${processingTime}ms`);
+      console.log(`[NERService] Found ${entities.length} entities:`, entities);
 
       return {
         entities,
@@ -256,14 +154,14 @@ class NERService {
         processingTime,
         textLength: text.length
       };
-    } catch (err) {
-      console.error('[NER] Inference error:', err);
+    } catch (error) {
+      console.error('[NERService] SmolLM2 inference error:', error);
       this.hasError = true;
-      this.errorMessage = err instanceof Error ? err.message : 'Inference failed';
+      this.errorMessage = error instanceof Error ? error.message : 'Inference failed';
       
-      return { 
-        entities: [], 
-        totalCount: 0, 
+      return {
+        entities: [],
+        totalCount: 0,
         entityTypes: {},
         processingTime: Date.now() - startTime,
         textLength: text.length
@@ -271,7 +169,50 @@ class NERService {
     }
   }
 
-  // Public status methods
+  private parseEntitiesFromResponse(response: string, originalText: string): NEREntity[] {
+    const entities: NEREntity[] = [];
+    
+    // Simple parsing logic - look for common entity patterns in the response
+    const lines = response.split('\n');
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.includes(':') && (trimmed.includes('Person') || trimmed.includes('Place') || trimmed.includes('Organization'))) {
+        const parts = trimmed.split(':');
+        if (parts.length >= 2) {
+          const type = parts[0].trim().toUpperCase();
+          const value = parts[1].trim();
+          
+          // Find the entity in the original text
+          const start = originalText.toLowerCase().indexOf(value.toLowerCase());
+          if (start !== -1) {
+            entities.push({
+              value,
+              type,
+              start,
+              end: start + value.length,
+              confidence: 0.8
+            });
+          }
+        }
+      }
+    }
+    
+    return entities;
+  }
+
+  public async switchModel(modelId: string): Promise<void> {
+    console.log('[NERService] Switching to model:', modelId);
+    
+    if (modelId !== AVAILABLE_MODELS[0].id) {
+      throw new Error(`Unknown model: ${modelId}. Only ${AVAILABLE_MODELS[0].id} is supported.`);
+    }
+
+    this.currentModelId = modelId;
+    this.pipeline = null;
+    await this.initializePipeline();
+  }
+
   public getStatus(): NERStatus {
     return {
       isInitialized: this.initialized,
@@ -298,19 +239,20 @@ class NERService {
     return this.errorMessage;
   }
 
-  // Force reinitialize with current selected model
   public async reinitialize(): Promise<void> {
-    console.log('[NER] Force reinitializing...');
+    console.log('[NERService] Force reinitializing SmolLM2...');
     this.initialized = false;
     this.loading = false;
     this.hasError = false;
     this.errorMessage = '';
-    this.classifier = null;
-    this.currentModelId = '';
-    await this.init();
+    this.pipeline = null;
+    await this.initializePipeline();
+  }
+
+  public getAvailableModels(): ModelInfo[] {
+    return AVAILABLE_MODELS;
   }
 }
 
 // Export singleton instance
 export const nerService = new NERService();
-export type { CandidateLabels };
