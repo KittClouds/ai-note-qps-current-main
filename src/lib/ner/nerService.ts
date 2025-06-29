@@ -1,5 +1,5 @@
 
-import { pipeline, Pipeline } from '@huggingface/transformers';
+import { pipeline } from '@huggingface/transformers';
 
 export interface NEREntity {
   value: string;
@@ -44,7 +44,7 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
  * HuggingFace Transformers NER Service
  */
 class NERService {
-  private pipeline: Pipeline | null = null;
+  private pipeline: any = null; // Use any to avoid complex union type issues
   private currentModelId: string = AVAILABLE_MODELS[0].id;
   private initialized = false;
   private loading = false;
