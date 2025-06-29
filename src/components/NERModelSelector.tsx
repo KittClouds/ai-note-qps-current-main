@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, ChevronDown, Key, Check, X, Brain } from 'lucide-react';
+import { Settings, ChevronDown, Check, X, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -70,7 +70,6 @@ export function NERModelSelector() {
 
   const availableModels = nerServiceManager.getAvailableModels();
   const currentModel = nerServiceManager.getCurrentModel();
-  const hasGeminiKey = localStorage.getItem('gemini_api_key');
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -135,20 +134,6 @@ export function NERModelSelector() {
               <Button onClick={handleReinitialize} disabled={isLoading} size="sm" className="w-full">
                 Reinitialize Service
               </Button>
-            </div>
-          )}
-
-          {!hasGeminiKey && currentModel?.provider === 'gemini' && (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded">
-                <Key className="h-4 w-4 text-amber-600" />
-                <div className="text-sm">
-                  <div className="font-medium text-amber-800">API Key Required</div>
-                  <div className="text-amber-700">
-                    Configure your Gemini API key in the embedding settings to use Gemini NER models.
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 

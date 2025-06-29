@@ -26,16 +26,6 @@ export const GEMINI_NER_MODELS: GeminiModelInfo[] = [
     id: 'gemini-2.5-flash-lite-preview-06-17',
     name: 'Gemini 2.5 Flash Lite',
     description: 'Lightweight version for faster processing'
-  },
-  {
-    id: 'gemma-3n-e4b-it',
-    name: 'Gemma 3N E4B IT',
-    description: 'Advanced Gemma model for NER tasks'
-  },
-  {
-    id: 'gemma-3-27b-it',
-    name: 'Gemma 3 27B IT',
-    description: 'Large Gemma model for high-precision NER'
   }
 ];
 
@@ -64,7 +54,7 @@ export class GeminiNERProvider {
       console.log('[GeminiNER] API key found, provider ready');
     } else {
       this.hasError = true;
-      this.errorMessage = 'Gemini API key not found. Please configure it in the embedding settings.';
+      this.errorMessage = 'Gemini API key not found. Please configure it in the API settings.';
       console.warn('[GeminiNER] API key not found');
     }
   }

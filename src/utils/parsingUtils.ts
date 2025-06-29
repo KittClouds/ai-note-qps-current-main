@@ -21,7 +21,7 @@ export interface ParsedConnections {
   entities: Entity[];
   triples: Triple[];
   backlinks: string[]; // Stores backlink titles from <<title>> - THESE ARE DISPLAY-ONLY
-  nerEntities?: NEREntity[]; // Add NER entities
+  nerEntities?: NEREntity[]; // Add NER entities from all providers (Gemini, OpenRouter, Wink)
 }
 
 // Helper to extract text from TipTap JSON node recursively

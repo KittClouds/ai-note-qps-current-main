@@ -1,5 +1,6 @@
 
 import { geminiNERProvider, GEMINI_NER_MODELS, GeminiModelInfo } from './providers/GeminiNERProvider';
+import { openRouterNERProvider, OPENROUTER_NER_MODELS, OpenRouterModelInfo } from './providers/OpenRouterNERProvider';
 import { winkNERService, WinkNEREntity, WinkNERResult, WinkNERStatus } from './winkService';
 
 export interface NEREntity {
@@ -26,7 +27,7 @@ export interface NERStatus {
   modelId?: string;
 }
 
-export type NERProvider = 'gemini' | 'wink';
+export type NERProvider = 'gemini' | 'wink' | 'openrouter';
 
 export interface UnifiedModelInfo {
   id: string;
@@ -35,13 +36,19 @@ export interface UnifiedModelInfo {
   provider: NERProvider;
 }
 
-// Unified model list with Gemini and Wink
+// Unified model list with Gemini, OpenRouter, and Wink
 export const AVAILABLE_NER_MODELS: UnifiedModelInfo[] = [
   // Gemini models
   ...GEMINI_NER_MODELS.map(model => ({
     ...model,
     name: `${model.name} (Gemini)`,
     provider: 'gemini' as NERProvider
+  })),
+  // OpenRouter models
+  ...OPENROUTER_NER_MODELS.map(model => ({
+    ...model,
+    name: `${model.name} (OpenRouter)`,
+    provider: 'openrouter' as NERProvider
   })),
   // Wink model
   {
@@ -71,18 +78,18 @@ export interface UnifiedNERStatus {
 }
 
 /**
- * NER Service Manager - Handles switching between Gemini and Wink services
+ * NER Service Manager - Handles switching between Gemini, OpenRouter, and Wink services
  */
 class NERServiceManager {
   private currentProvider: NERProvider = 'gemini';
   private currentModelId: string = GEMINI_NER_MODELS[0].id;
 
   constructor() {
-    console.log('[NERManager] Service manager initialized with Gemini and Wink');
+    console.log('[NERManager] Service manager initialized with Gemini, OpenRouter, and Wink');
   }
 
   /**
-   * Get list of all available models from both providers
+   * Get list of all available models from all providers
    */
   public getAvailableModels(): UnifiedModelInfo[] {
     return AVAILABLE_NER_MODELS;
@@ -114,6 +121,8 @@ class NERServiceManager {
     // Switch to the appropriate service
     if (this.currentProvider === 'gemini') {
       await geminiNERProvider.switchModel(modelId);
+    } else if (this.currentProvider === 'openrouter') {
+      await openRouterNERProvider.switchModel(modelId);
     } else if (this.currentProvider === 'wink') {
       // Wink only has one model, so just ensure it's initialized
       if (!winkNERService.isInitialized() && !winkNERService.isLoading()) {
@@ -131,6 +140,12 @@ class NERServiceManager {
       return {
         ...result,
         provider: 'gemini'
+      };
+    } else if (this.currentProvider === 'openrouter') {
+      const result = await openRouterNERProvider.extractEntities(text);
+      return {
+        ...result,
+        provider: 'openrouter'
       };
     } else if (this.currentProvider === 'wink') {
       const result = await winkNERService.extractEntities(text);
@@ -152,6 +167,12 @@ class NERServiceManager {
       return {
         ...status,
         provider: 'gemini'
+      };
+    } else if (this.currentProvider === 'openrouter') {
+      const status = openRouterNERProvider.getStatus();
+      return {
+        ...status,
+        provider: 'openrouter'
       };
     } else if (this.currentProvider === 'wink') {
       const status = winkNERService.getStatus();
@@ -178,6 +199,8 @@ class NERServiceManager {
     
     if (this.currentProvider === 'gemini') {
       await geminiNERProvider.reinitialize();
+    } else if (this.currentProvider === 'openrouter') {
+      await openRouterNERProvider.reinitialize();
     } else if (this.currentProvider === 'wink') {
       await winkNERService.reinitialize();
     }
@@ -196,6 +219,8 @@ class NERServiceManager {
   public isInitialized(): boolean {
     if (this.currentProvider === 'gemini') {
       return geminiNERProvider.isInitialized();
+    } else if (this.currentProvider === 'openrouter') {
+      return openRouterNERProvider.isInitialized();
     } else if (this.currentProvider === 'wink') {
       return winkNERService.isInitialized();
     }
@@ -208,6 +233,8 @@ class NERServiceManager {
   public isLoading(): boolean {
     if (this.currentProvider === 'gemini') {
       return geminiNERProvider.isLoading();
+    } else if (this.currentProvider === 'openrouter') {
+      return openRouterNERProvider.isLoading();
     } else if (this.currentProvider === 'wink') {
       return winkNERService.isLoading();
     }
@@ -220,6 +247,8 @@ class NERServiceManager {
   public hasErrors(): boolean {
     if (this.currentProvider === 'gemini') {
       return geminiNERProvider.hasErrors();
+    } else if (this.currentProvider === 'openrouter') {
+      return openRouterNERProvider.hasErrors();
     } else if (this.currentProvider === 'wink') {
       return winkNERService.hasErrors();
     }

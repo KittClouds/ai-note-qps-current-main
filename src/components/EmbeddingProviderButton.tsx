@@ -1,24 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings, ChevronDown, Key, Check, X } from 'lucide-react';
+import { Settings, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { providerRegistry } from '@/lib/embeddings/providers/ProviderRegistry';
 import { embeddingsService } from '@/lib/embeddings/embeddingsService';
 import { useToast } from '@/hooks/use-toast';
 
 export function EmbeddingProviderButton() {
   const [selectedProvider, setSelectedProvider] = useState<string>('');
-  const [geminiApiKey, setGeminiApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -26,17 +22,15 @@ export function EmbeddingProviderButton() {
     if (activeProviderId) {
       setSelectedProvider(activeProviderId);
     }
-
-    // Check if Gemini API key exists
-    const storedKey = localStorage.getItem('gemini_api_key');
-    if (storedKey) {
-      setGeminiApiKey('••••••••••••••••');
-    }
   }, []);
 
   const handleProviderChange = async (providerId: string) => {
     if (providerId === 'gemini' && !localStorage.getItem('gemini_api_key')) {
-      // Don't switch yet, let user add API key first
+      toast({
+        title: 'API Key Required',
+        description: 'Please configure your Gemini API key in API Settings first.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -60,55 +54,8 @@ export function EmbeddingProviderButton() {
     }
   };
 
-  const handleGeminiSetup = async () => {
-    if (!geminiApiKey || geminiApiKey === '••••••••••••••••') {
-      toast({
-        title: 'Error',
-        description: 'Please enter a valid Gemini API key',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await embeddingsService.switchProvider('gemini', geminiApiKey);
-      setSelectedProvider('gemini');
-      toast({
-        title: 'Gemini configured',
-        description: 'Successfully switched to Gemini embeddings',
-      });
-      setIsDialogOpen(false);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to configure Gemini provider',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleClearApiKey = () => {
-    localStorage.removeItem('gemini_api_key');
-    setGeminiApiKey('');
-    setShowClearConfirm(false);
-    
-    // If currently using Gemini, switch back to HuggingFace
-    if (selectedProvider === 'gemini') {
-      handleProviderChange('huggingface');
-    }
-    
-    toast({
-      title: 'API key cleared',
-      description: 'Gemini API key has been removed',
-    });
-  };
-
   const providers = providerRegistry.getAvailableProviders();
   const currentProvider = embeddingsService.getCurrentProvider();
-  const hasGeminiKey = localStorage.getItem('gemini_api_key');
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -158,84 +105,6 @@ export function EmbeddingProviderButton() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <Separator />
-
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              <Label>Gemini API Key</Label>
-            </div>
-            
-            {hasGeminiKey ? (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 p-2 bg-muted/30 rounded">
-                  <Check className="h-4 w-4 text-green-600" />
-                  <span className="text-sm">API key configured</span>
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    type="password"
-                    placeholder="Update API key..."
-                    value={geminiApiKey}
-                    onChange={(e) => setGeminiApiKey(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button onClick={handleGeminiSetup} disabled={isLoading} size="sm">
-                    Update
-                  </Button>
-                </div>
-                <AlertDialog open={showClearConfirm} onOpenChange={setShowClearConfirm}>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full">
-                      <X className="h-3 w-3 mr-1" />
-                      Clear API Key
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Clear API Key?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This will remove your Gemini API key and switch back to HuggingFace if currently using Gemini.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleClearApiKey}>
-                        Clear Key
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    type="password"
-                    placeholder="Enter your Gemini API key"
-                    value={geminiApiKey}
-                    onChange={(e) => setGeminiApiKey(e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button onClick={handleGeminiSetup} disabled={isLoading} size="sm">
-                    Setup
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Get your API key from{' '}
-                  <a 
-                    href="https://aistudio.google.com/app/apikey" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    Google AI Studio
-                  </a>
-                </p>
-              </div>
-            )}
           </div>
 
           {currentProvider && (
