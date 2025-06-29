@@ -8,6 +8,7 @@ import { BulkActionsToolbar } from "./BulkActionsToolbar";
 import { EnhancedSearchBar } from "./EnhancedSearchBar";
 import { UndoRedoToolbar } from "./UndoRedoToolbar";
 import { SystemStatusModal } from "./SystemStatusModal";
+import { APISettingsModal } from "./APISettingsModal";
 import { useNotes } from "@/contexts/LiveStoreNotesContext";
 import { useBulkSelection } from "@/contexts/BulkSelectionContext";
 import { useState } from "react";
@@ -58,6 +59,7 @@ export function AppSidebar({
                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={enterSelectionMode} title="Bulk Select">
                   <CheckSquare className="h-4 w-4" />
                 </Button>
+                <APISettingsModal />
                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setShowSystemStatus(true)} title="System Status">
                   <Settings className="h-4 w-4" />
                 </Button>

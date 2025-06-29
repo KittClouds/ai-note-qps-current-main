@@ -1,4 +1,3 @@
-
 import { AppSidebar } from "@/components/app-sidebar";
 import RightSidebar from "@/components/RightSidebar";
 import { RightSidebarProvider, RightSidebarTrigger } from "@/components/RightSidebarProvider";
@@ -16,7 +15,6 @@ import { useNotes } from "@/contexts/LiveStoreNotesContext";
 import { EntityManagerDrawer } from "@/components/entity-manager/EntityManagerDrawer";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { LayoutSizer } from "@/components/ui/layout-sizer";
-import { APISettingsModal } from "@/components/APISettingsModal";
 
 function NotesApp() {
   const { theme } = useTheme();
@@ -73,7 +71,6 @@ function NotesApp() {
                     <Menu className="h-4 w-4" />
                   </Button>
                   <ThemeToggle />
-                  <APISettingsModal />
                   <EntityManagerDrawer />
                   <RightSidebarTrigger />
                 </div>
