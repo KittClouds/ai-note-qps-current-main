@@ -1,5 +1,5 @@
 // Updated parsing utilities for TipTap schema integration
-import { NEREntity } from '@/lib/ner/nerService';
+import { NEREntity } from '@/lib/ner/nerServiceManager';
 
 export interface Entity {
   kind: string;

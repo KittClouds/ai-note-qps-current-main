@@ -142,7 +142,7 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
         return;
       }
       
-      const providerName = serviceStatus.provider === 'huggingface' ? 'HuggingFace' : 'Wink NLP';
+      const providerName = serviceStatus.provider === 'gemini' ? 'Gemini' : 'Wink NLP';
       setNerStatus(`Running ${providerName} analysis...`);
       
       const result = await nerServiceManager.extractEntities(plainText);

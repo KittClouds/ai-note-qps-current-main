@@ -1,5 +1,4 @@
-
-import { NEREntity, NERResult, NERStatus } from '../nerService';
+import { NEREntity, NERResult, NERStatus } from '../nerServiceManager';
 
 export interface GeminiNERResponse {
   candidates: Array<{
