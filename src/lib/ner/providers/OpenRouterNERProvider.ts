@@ -20,11 +20,6 @@ export const OPENROUTER_NER_MODELS: OpenRouterModelInfo[] = [
     id: 'minimax/minimax-m1:extended',
     name: 'Minimax M1 Extended',
     description: 'Advanced NER with structured outputs'
-  },
-  {
-    id: 'microsoft/mai-ds-r1:free',
-    name: 'Microsoft MAI DS R1',
-    description: 'Microsoft AI model for data science tasks'
   }
 ];
 
