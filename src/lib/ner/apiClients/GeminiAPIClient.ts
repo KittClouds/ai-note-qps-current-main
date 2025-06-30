@@ -64,6 +64,46 @@ export class GeminiAPIClient implements NERAPIClient {
     this.errorMessage = '';
 
     try {
+      // Determine the correct schema structure
+      let responseSchema;
+      
+      if (schema.items && schema.items.properties) {
+        // NER schema structure (array of entities)
+        responseSchema = {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: schema.items.properties,
+            required: schema.items.required || []
+          }
+        };
+      } else if (schema.properties) {
+        // Knowledge graph schema structure (object with entities and triples)
+        responseSchema = {
+          type: 'OBJECT',
+          properties: schema.properties,
+          required: schema.required || []
+        };
+      } else {
+        // Fallback for unknown schema structure
+        console.warn('[GeminiAPIClient] Unknown schema structure, using fallback');
+        responseSchema = {
+          type: 'ARRAY',
+          items: {
+            type: 'OBJECT',
+            properties: {
+              id: { type: 'STRING' },
+              value: { type: 'STRING' },
+              type: { type: 'STRING' },
+              confidence: { type: 'NUMBER' },
+              start: { type: 'INTEGER' },
+              end: { type: 'INTEGER' }
+            },
+            required: ['id', 'value', 'type']
+          }
+        };
+      }
+
       const response = await fetch(`${this.baseUrl}${this.currentModelId}:generateContent`, {
         method: 'POST',
         headers: {
@@ -76,14 +116,7 @@ export class GeminiAPIClient implements NERAPIClient {
           }],
           generationConfig: {
             responseMimeType: 'application/json',
-            responseSchema: {
-              type: 'ARRAY',
-              items: {
-                type: 'OBJECT',
-                properties: schema.items.properties,
-                required: schema.items.required
-              }
-            }
+            responseSchema: responseSchema
           }
         }),
       });
@@ -93,7 +126,7 @@ export class GeminiAPIClient implements NERAPIClient {
       }
 
       const data: GeminiNERResponse = await response.json();
-      return this.parseResponse(data);
+      return this.parseResponse(data, schema);
     } catch (error) {
       console.error('[GeminiAPIClient] API error:', error);
       this.hasError = true;
@@ -104,7 +137,7 @@ export class GeminiAPIClient implements NERAPIClient {
     }
   }
 
-  private parseResponse(response: GeminiNERResponse): NEREntity[] {
+  private parseResponse(response: GeminiNERResponse, schema: any): NEREntity[] {
     try {
       if (!response.candidates || response.candidates.length === 0) {
         console.warn('[GeminiAPIClient] No candidates in response');
@@ -117,7 +150,19 @@ export class GeminiAPIClient implements NERAPIClient {
         return [];
       }
 
-      return JSON.parse(content) as NEREntity[];
+      const parsedData = JSON.parse(content);
+      
+      // Handle different response structures
+      if (schema.items && schema.items.properties) {
+        // NER response - should be an array
+        return Array.isArray(parsedData) ? parsedData as NEREntity[] : [];
+      } else if (schema.properties && parsedData.entities) {
+        // Knowledge graph response - extract entities from the object
+        return Array.isArray(parsedData.entities) ? parsedData.entities as NEREntity[] : [];
+      } else {
+        // Fallback - try to return as array
+        return Array.isArray(parsedData) ? parsedData as NEREntity[] : [];
+      }
     } catch (error) {
       console.error('[GeminiAPIClient] Failed to parse response:', error);
       return [];

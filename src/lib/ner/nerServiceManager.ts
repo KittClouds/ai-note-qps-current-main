@@ -1,4 +1,3 @@
-
 import { GeminiAPIClient } from './apiClients/GeminiAPIClient';
 import { OpenRouterAPIClient } from './apiClients/OpenRouterAPIClient';
 import { winkNERService, WinkNEREntity, WinkNERResult, WinkNERStatus } from './winkService';
@@ -115,11 +114,12 @@ export interface UnifiedNERStatus {
 /**
  * NER Service Manager - Handles switching between Gemini, OpenRouter, and Wink services
  */
-class NERServiceManager {
+export class NERServiceManager {
   private currentProvider: NERProvider = 'gemini';
   private currentModelId: string = GEMINI_NER_MODELS[0].id;
   private geminiClient: GeminiAPIClient;
   private openRouterClient: OpenRouterAPIClient;
+  private currentAPIClient: GeminiAPIClient | OpenRouterAPIClient | null = null;
 
   constructor() {
     console.log('[NERManager] Service manager initialized with Gemini, OpenRouter, and Wink');
@@ -160,8 +160,10 @@ class NERServiceManager {
     // Switch to the appropriate client
     if (this.currentProvider === 'gemini') {
       this.geminiClient.switchModel(modelId);
+      this.currentAPIClient = this.geminiClient;
     } else if (this.currentProvider === 'openrouter') {
       this.openRouterClient.switchModel(modelId);
+      this.currentAPIClient = this.openRouterClient;
     } else if (this.currentProvider === 'wink') {
       // Wink only has one model, so just ensure it's initialized
       if (!winkNERService.isInitialized() && !winkNERService.isLoading()) {
@@ -212,55 +214,56 @@ class NERServiceManager {
   /**
    * Extract knowledge graph using the current provider
    */
-  public async extractKnowledgeGraph(text: string): Promise<UnifiedKnowledgeGraphResult> {
-    if (!text?.trim()) {
-      const emptyGraph = knowledgeGraphService.createEmptyKnowledgeGraph();
-      return {
-        knowledgeGraph: emptyGraph,
-        provider: this.currentProvider
-      };
+  public async extractKnowledgeGraph(text: string): Promise<{ knowledgeGraph: KnowledgeGraph }> {
+    console.log('[NERServiceManager] Starting knowledge graph extraction');
+    
+    if (!this.isReady()) {
+      await this.initialize();
     }
 
-    if (this.currentProvider === 'gemini') {
+    const startTime = Date.now();
+    
+    try {
       const prompt = knowledgeGraphService.generateKnowledgeGraphPrompt(text);
-      const rawData = await this.geminiClient.extractEntities(text, prompt, KNOWLEDGE_GRAPH_SCHEMA);
-      const knowledgeGraph = knowledgeGraphService.processKnowledgeGraph(rawData, text);
-      return {
-        knowledgeGraph,
-        provider: 'gemini'
-      };
-    } else if (this.currentProvider === 'openrouter') {
-      const prompt = knowledgeGraphService.generateKnowledgeGraphPrompt(text);
-      const rawData = await this.openRouterClient.extractEntities(text, prompt, KNOWLEDGE_GRAPH_SCHEMA);
-      const knowledgeGraph = knowledgeGraphService.processKnowledgeGraph(rawData, text);
-      return {
-        knowledgeGraph,
-        provider: 'openrouter'
-      };
-    } else if (this.currentProvider === 'wink') {
-      // For Wink, we'll use basic NER and create simple triples
-      const result = await winkNERService.extractEntities(text);
-      const knowledgeGraph: KnowledgeGraph = {
-        entities: result.entities.map(entity => ({
-          id: `entity_${Math.random().toString(36).substr(2, 9)}`,
-          value: entity.value,
-          type: entity.type,
-          confidence: entity.confidence,
-          start: entity.start,
-          end: entity.end
-        })),
-        triples: [], // Wink doesn't support relationship extraction
-        totalEntities: result.entities.length,
-        totalTriples: 0,
-        processingTime: result.processingTime,
-        textLength: result.textLength
-      };
-      return {
-        knowledgeGraph,
-        provider: 'wink'
-      };
-    } else {
-      throw new Error(`Unknown provider: ${this.currentProvider}`);
+      console.log('[NERServiceManager] Generated prompt for knowledge graph');
+
+      // Use the API client to extract the knowledge graph
+      const rawEntities = await this.currentAPIClient!.extractEntities(
+        text, 
+        prompt, 
+        KNOWLEDGE_GRAPH_SCHEMA
+      );
+
+      console.log('[NERServiceManager] Raw API response:', rawEntities);
+
+      // For knowledge graph, we need to parse the response differently
+      // The API should return the full knowledge graph structure, but we might only get entities
+      // Let's try to reconstruct the knowledge graph from the response
+      let knowledgeGraphData;
+      
+      if (Array.isArray(rawEntities)) {
+        // If we only got entities, create a minimal knowledge graph structure
+        console.log('[NERServiceManager] Received entities array, creating knowledge graph structure');
+        knowledgeGraphData = {
+          entities: rawEntities,
+          triples: []
+        };
+      } else {
+        // If we got a full knowledge graph object, use it directly
+        console.log('[NERServiceManager] Received full knowledge graph object');
+        knowledgeGraphData = rawEntities;
+      }
+
+      const knowledgeGraph = knowledgeGraphService.processKnowledgeGraph(knowledgeGraphData, text);
+      const processingTime = Date.now() - startTime;
+
+      console.log(`[NERServiceManager] Knowledge graph extraction completed in ${processingTime}ms`);
+      console.log(`[NERServiceManager] Found ${knowledgeGraph.totalEntities} entities and ${knowledgeGraph.totalTriples} triples`);
+
+      return { knowledgeGraph };
+    } catch (error) {
+      console.error('[NERServiceManager] Error during knowledge graph extraction:', error);
+      throw new Error(`Knowledge graph extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -361,6 +364,18 @@ class NERServiceManager {
       return winkNERService.hasErrors();
     }
     return false;
+  }
+
+  private isReady(): boolean {
+    return this.currentAPIClient !== null;
+  }
+
+  private async initialize(): Promise<void> {
+    if (this.currentProvider === 'gemini') {
+      await this.geminiClient.initialize();
+    } else if (this.currentProvider === 'openrouter') {
+      await this.openRouterClient.initialize();
+    }
   }
 }
 
