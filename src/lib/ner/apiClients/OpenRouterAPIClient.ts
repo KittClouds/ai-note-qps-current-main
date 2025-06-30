@@ -27,7 +27,7 @@ export class OpenRouterAPIClient implements NERAPIClient {
     this.initialize();
   }
 
-  private initialize(): void {
+  public initialize(): void {
     this.apiKey = localStorage.getItem('openrouter_api_key');
     
     if (this.apiKey) {

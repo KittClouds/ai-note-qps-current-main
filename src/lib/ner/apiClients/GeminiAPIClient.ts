@@ -29,7 +29,7 @@ export class GeminiAPIClient implements NERAPIClient {
     this.initialize();
   }
 
-  private initialize(): void {
+  public initialize(): void {
     this.apiKey = localStorage.getItem('gemini_api_key');
     
     if (this.apiKey) {
@@ -137,7 +137,7 @@ export class GeminiAPIClient implements NERAPIClient {
     }
   }
 
-  private parseResponse(response: GeminiNERResponse, schema: any): NEREntity[] {
+  private parseResponse(response: GeminiNERResponse, schema: any): NEREntity[] | any {
     try {
       if (!response.candidates || response.candidates.length === 0) {
         console.warn('[GeminiAPIClient] No candidates in response');
@@ -156,9 +156,9 @@ export class GeminiAPIClient implements NERAPIClient {
       if (schema.items && schema.items.properties) {
         // NER response - should be an array
         return Array.isArray(parsedData) ? parsedData as NEREntity[] : [];
-      } else if (schema.properties && parsedData.entities) {
-        // Knowledge graph response - extract entities from the object
-        return Array.isArray(parsedData.entities) ? parsedData.entities as NEREntity[] : [];
+      } else if (schema.properties) {
+        // Knowledge graph response - return the full object
+        return parsedData;
       } else {
         // Fallback - try to return as array
         return Array.isArray(parsedData) ? parsedData as NEREntity[] : [];
