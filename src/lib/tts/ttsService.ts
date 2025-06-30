@@ -85,7 +85,21 @@ class TTSService {
 
     try {
       const audio = await this.tts.generate(text, { voice });
-      return audio.data; // Return the audio blob
+      
+      // Convert the audio data to a proper Blob
+      let audioData;
+      if (audio.data instanceof ArrayBuffer) {
+        audioData = new Uint8Array(audio.data);
+      } else if (audio.data instanceof Uint8Array) {
+        audioData = audio.data;
+      } else {
+        // If it's already a Blob or has a different format
+        audioData = audio.data;
+      }
+      
+      // Create a proper audio Blob
+      const audioBlob = new Blob([audioData], { type: 'audio/wav' });
+      return audioBlob;
     } catch (error) {
       console.error('Failed to generate speech:', error);
       throw new Error('Failed to generate speech');
