@@ -9,6 +9,7 @@ export interface CytoscapeNode {
     id: string;
     type: 'folder' | 'note' | 'entity' | 'tag' | 'wikilink' | 'crosslink' | 'attachment';
     label: string;
+    parent?: string; // Added for compound nodes
     properties: Record<string, any>;
   };
 }
@@ -18,7 +19,7 @@ export interface CytoscapeEdge {
     id: string;
     source: string;
     target: string;
-    type: 'contains' | 'references' | 'mentions' | 'relates' | 'links' | 'parent-child';
+    type: 'contains' | 'references' | 'mentions' | 'relates' | 'links';
     properties: Record<string, any>;
   };
 }
@@ -35,11 +36,24 @@ export interface CytoscapeGraphData {
   };
 }
 
+export interface AdvancedCentralityMetrics {
+  id: string;
+  degree: number;
+  pageRank: number;
+  betweenness: number;
+  closeness: number;
+}
+
 export interface GraphAnalysis {
-  centralNodes: Array<{ id: string; centrality: number }>;
-  clusters: Array<{ id: string; nodes: string[] }>;
+  centralNodes: AdvancedCentralityMetrics[];
+  clusters: Array<{ id: string; nodes: string[]; modularity?: number }>;
   pathsBetween: (source: string, target: string) => string[];
   subgraph: (nodeIds: string[]) => CytoscapeGraphData;
+  hierarchicalStructure: {
+    rootNodes: string[];
+    maxDepth: number;
+    compoundRelations: Array<{ parent: string; children: string[] }>;
+  };
 }
 
 export class CytoscapeGraphModel {
@@ -48,19 +62,20 @@ export class CytoscapeGraphModel {
 
   /**
    * Build complete system graph from notes, folders, and their content
+   * Enhanced with compound node structure
    */
   public buildSystemGraph(
     items: FileSystemItem[],
     connectionsMap: Map<string, ParsedConnections & { crosslinks: Array<{ noteId: string; label: string }> }>,
     knowledgeGraphs: Map<string, KnowledgeGraph>
   ): CytoscapeGraphData {
-    console.log('[CytoscapeGraphModel] Building system graph');
+    console.log('[CytoscapeGraphModel] Building system graph with compound nodes');
     
     const nodes: CytoscapeNode[] = [];
     const edges: CytoscapeEdge[] = [];
     let edgeIdCounter = 0;
 
-    // Process folders and notes
+    // Process folders and notes with compound structure
     items.forEach(item => {
       if (item.type === 'folder') {
         nodes.push(this.createFolderNode(item));
@@ -121,12 +136,8 @@ export class CytoscapeGraphModel {
         }
       }
 
-      // Add parent-child relationships
-      if (item.parentId) {
-        edges.push(this.createEdge(`edge-${edgeIdCounter++}`, item.parentId, item.id, 'parent-child', {
-          relationship: 'contains'
-        }));
-      }
+      // Note: Parent-child relationships are now handled via compound nodes (parent property)
+      // No need for explicit parent-child edges
     });
 
     this.graphData = {
@@ -159,7 +170,7 @@ export class CytoscapeGraphModel {
     const edges: CytoscapeEdge[] = [];
     let edgeIdCounter = 0;
 
-    // Add entities
+    // Add entities as children of the note (compound structure)
     knowledgeGraph.entities.forEach(entity => {
       nodes.push(this.createEntityNode(entity, note.id));
       edges.push(this.createEdge(`edge-${edgeIdCounter++}`, note.id, entity.id, 'contains', {
@@ -210,12 +221,12 @@ export class CytoscapeGraphModel {
       headless: true // For computational analysis only
     });
 
-    console.log('[CytoscapeGraphModel] Cytoscape instance initialized');
+    console.log('[CytoscapeGraphModel] Cytoscape instance initialized with compound node support');
     return this.cy;
   }
 
   /**
-   * Perform graph analysis
+   * Perform advanced graph analysis with sophisticated centrality algorithms
    */
   public analyzeGraph(): GraphAnalysis | null {
     if (!this.cy) {
@@ -223,27 +234,180 @@ export class CytoscapeGraphModel {
       return null;
     }
 
-    // Calculate centrality - fixed to pass includeLoops parameter
-    const centralNodes = this.cy.nodes().map(node => ({
-      id: node.id(),
-      centrality: node.degree(false) // false means don't include loops
-    })).sort((a, b) => b.centrality - a.centrality);
+    console.log('[CytoscapeGraphModel] Performing advanced graph analysis');
 
-    // Simple clustering based on node types
-    const clusters = this.groupNodesByType();
+    // Advanced Centrality Analysis
+    const pageRank = this.cy.elements().pageRank({ dampingFactor: 0.85 });
+    const betweenness = this.cy.elements().betweennessCentrality({ directed: false });
+    const closeness = this.cy.elements().closenessCentrality({ directed: false });
+
+    const centralNodes: AdvancedCentralityMetrics[] = this.cy.nodes().map(node => ({
+      id: node.id(),
+      degree: node.degree(false),
+      pageRank: pageRank.rank(node),
+      betweenness: betweenness.betweenness(node),
+      closeness: closeness.closeness(node)
+    }))
+    .sort((a, b) => b.pageRank - a.pageRank); // Sort by influence (PageRank)
+
+    // Enhanced clustering - fallback to type-based if community detection not available
+    const clusters = this.detectCommunities();
+
+    // Analyze hierarchical structure using compound nodes
+    const hierarchicalStructure = this.analyzeHierarchicalStructure();
+
+    console.log(`[CytoscapeGraphModel] Analysis complete: ${centralNodes.length} nodes analyzed, ${clusters.length} communities detected`);
 
     return {
-      centralNodes: centralNodes.slice(0, 10), // Top 10 most central
+      centralNodes: centralNodes.slice(0, 20), // Top 20 most influential nodes
       clusters,
       pathsBetween: (source: string, target: string) => {
         if (!this.cy) return [];
-        // Fixed dijkstra API usage
         const dijkstra = this.cy.elements().dijkstra({ root: `#${source}` });
         const path = dijkstra.pathTo(this.cy.$(`#${target}`));
         return path.nodes().map(node => node.id());
       },
-      subgraph: (nodeIds: string[]) => this.extractSubgraph(nodeIds)
+      subgraph: (nodeIds: string[]) => this.extractSubgraph(nodeIds),
+      hierarchicalStructure
     };
+  }
+
+  /**
+   * Detect communities using available algorithms or fallback to type-based clustering
+   */
+  private detectCommunities(): Array<{ id: string; nodes: string[]; modularity?: number }> {
+    if (!this.cy) return [];
+
+    // Note: This is prepared for community detection extensions like cytoscape-louvain
+    // For now, we'll use an enhanced type-based approach with structural considerations
+    
+    const typeGroups: Record<string, string[]> = {};
+    
+    this.cy.nodes().forEach(node => {
+      const type = node.data('type');
+      if (!typeGroups[type]) {
+        typeGroups[type] = [];
+      }
+      typeGroups[type].push(node.id());
+    });
+
+    // Enhance with structural clustering - group nodes that are highly interconnected
+    const structuralClusters = this.findStructuralClusters();
+
+    const combinedClusters = [
+      ...Object.entries(typeGroups).map(([type, nodes]) => ({
+        id: `type-${type}`,
+        nodes
+      })),
+      ...structuralClusters
+    ];
+
+    return combinedClusters;
+  }
+
+  /**
+   * Find structural clusters based on edge density
+   */
+  private findStructuralClusters(): Array<{ id: string; nodes: string[] }> {
+    if (!this.cy) return [];
+
+    const clusters: Array<{ id: string; nodes: string[] }> = [];
+    const visited = new Set<string>();
+
+    this.cy.nodes().forEach(node => {
+      if (visited.has(node.id())) return;
+
+      const cluster = this.expandCluster(node, visited);
+      if (cluster.length > 2) { // Only include clusters with more than 2 nodes
+        clusters.push({
+          id: `structural-${clusters.length}`,
+          nodes: cluster
+        });
+      }
+    });
+
+    return clusters;
+  }
+
+  /**
+   * Expand cluster using local density
+   */
+  private expandCluster(startNode: any, visited: Set<string>): string[] {
+    const cluster = [startNode.id()];
+    visited.add(startNode.id());
+
+    const neighbors = startNode.neighborhood().nodes();
+    
+    neighbors.forEach((neighbor: any) => {
+      if (!visited.has(neighbor.id())) {
+        const commonNeighbors = startNode.neighborhood().intersection(neighbor.neighborhood()).nodes().length;
+        const totalNeighbors = Math.max(startNode.degree(false), neighbor.degree(false));
+        
+        // Include in cluster if they share significant common neighbors
+        if (commonNeighbors / totalNeighbors > 0.3) {
+          cluster.push(neighbor.id());
+          visited.add(neighbor.id());
+        }
+      }
+    });
+
+    return cluster;
+  }
+
+  /**
+   * Analyze hierarchical structure using compound nodes
+   */
+  private analyzeHierarchicalStructure(): {
+    rootNodes: string[];
+    maxDepth: number;
+    compoundRelations: Array<{ parent: string; children: string[] }>;
+  } {
+    if (!this.cy) {
+      return { rootNodes: [], maxDepth: 0, compoundRelations: [] };
+    }
+
+    const rootNodes: string[] = [];
+    const compoundRelations: Array<{ parent: string; children: string[] }> = [];
+    let maxDepth = 0;
+
+    this.cy.nodes().forEach(node => {
+      if (node.isOrphan()) {
+        rootNodes.push(node.id());
+      }
+
+      if (node.isParent()) {
+        const children = node.children().map(child => child.id());
+        compoundRelations.push({
+          parent: node.id(),
+          children
+        });
+
+        // Calculate depth
+        const depth = this.calculateNodeDepth(node);
+        maxDepth = Math.max(maxDepth, depth);
+      }
+    });
+
+    return {
+      rootNodes,
+      maxDepth,
+      compoundRelations
+    };
+  }
+
+  /**
+   * Calculate the depth of a node in the compound hierarchy
+   */
+  private calculateNodeDepth(node: any): number {
+    let depth = 0;
+    let current = node;
+
+    while (!current.isOrphan()) {
+      current = current.parent();
+      depth++;
+    }
+
+    return depth;
   }
 
   /**
@@ -276,10 +440,10 @@ export class CytoscapeGraphModel {
         id: folder.id,
         type: 'folder',
         label: folder.title,
+        parent: folder.parentId || undefined, // Compound node support
         properties: {
           createdAt: folder.createdAt,
           updatedAt: folder.updatedAt,
-          parentId: folder.parentId
         }
       }
     };
@@ -291,11 +455,11 @@ export class CytoscapeGraphModel {
         id: note.id,
         type: 'note',
         label: note.title,
+        parent: note.parentId || undefined, // Compound node support
         properties: {
           contentLength: note.content.length,
           createdAt: note.createdAt,
           updatedAt: note.updatedAt,
-          parentId: note.parentId
         }
       }
     };
@@ -307,6 +471,7 @@ export class CytoscapeGraphModel {
         id: entity.id,
         type: 'entity',
         label: entity.value,
+        parent: noteId, // Entities are children of their containing note
         properties: {
           entityType: entity.type,
           confidence: entity.confidence || 0.8,
@@ -343,26 +508,6 @@ export class CytoscapeGraphModel {
     };
   }
 
-  private groupNodesByType(): Array<{ id: string; nodes: string[] }> {
-    if (!this.cy) return [];
-
-    const typeGroups: Record<string, string[]> = {};
-    
-    // Fixed node iteration - use forEach instead of .map().id()
-    this.cy.nodes().forEach(node => {
-      const type = node.data('type');
-      if (!typeGroups[type]) {
-        typeGroups[type] = [];
-      }
-      typeGroups[type].push(node.id());
-    });
-
-    return Object.entries(typeGroups).map(([type, nodes]) => ({
-      id: type,
-      nodes
-    }));
-  }
-
   private extractSubgraph(nodeIds: string[]): CytoscapeGraphData {
     if (!this.cy || !this.graphData) {
       return { nodes: [], edges: [], metadata: { generated: '', noteCount: 0, folderCount: 0, entityCount: 0, relationshipCount: 0 } };
@@ -373,7 +518,7 @@ export class CytoscapeGraphModel {
 
     const nodes = this.graphData.nodes.filter(node => nodeIds.includes(node.data.id));
     
-    // Fixed edge filtering - properly get edge IDs from Cytoscape collection
+    // Get edge IDs from Cytoscape collection
     const edgeIds: string[] = [];
     connectedEdges.forEach(cyEdge => {
       edgeIds.push(cyEdge.id());
