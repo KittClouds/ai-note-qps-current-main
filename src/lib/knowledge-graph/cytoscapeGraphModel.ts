@@ -226,6 +226,85 @@ export class CytoscapeGraphModel {
   }
 
   /**
+   * HIGH-PERFORMANCE: Adds a collection of nodes and edges to the graph using batch operations
+   */
+  public addElements(elements: ElementDefinition[]): void {
+    if (!this.cy) {
+      console.warn('[CytoscapeGraphModel] Cannot add elements, Cytoscape not initialized.');
+      return;
+    }
+
+    this.cy.batch(() => {
+      this.cy!.add(elements);
+    });
+
+    console.log(`[CytoscapeGraphModel] Batched addition of ${elements.length} elements.`);
+  }
+
+  /**
+   * CRUD - UPDATE: Moves a node to a new parent (e.g., moving a note to another folder)
+   */
+  public moveNode(nodeId: string, newParentId: string | null): void {
+    if (!this.cy) return;
+
+    const node = this.cy.getElementById(nodeId);
+    if (node.empty()) {
+      console.warn(`[CytoscapeGraphModel] Move failed: Node with ID ${nodeId} not found.`);
+      return;
+    }
+
+    // ele.move() is the specific API for changing a node's parent in a compound hierarchy
+    node.move({ parent: newParentId });
+    console.log(`[CytoscapeGraphModel] Moved node ${nodeId} to parent ${newParentId}.`);
+  }
+
+  /**
+   * CRUD - DELETE: Removes a node and all its descendants from the graph
+   */
+  public deleteNodeAndDescendants(nodeId: string): void {
+    if (!this.cy) return;
+
+    const node = this.cy.getElementById(nodeId);
+    if (node.empty()) return;
+
+    // The cy.remove() command on a parent node automatically removes all its descendants
+    const removedElements = this.cy.remove(node);
+    console.log(`[CytoscapeGraphModel] Removed ${removedElements.length} elements (node and its descendants).`);
+  }
+
+  /**
+   * CRUD - READ: Extracts a complete subgraph for a given parent node and its descendants
+   */
+  public getSubgraphFor(parentId: string): { nodes: any[], edges: any[] } | null {
+    if (!this.cy) return null;
+
+    const parentNode = this.cy.getElementById(parentId);
+    if (parentNode.empty()) return null;
+
+    // Get the parent and all its descendants, and all edges connecting them
+    const subgraphElements = parentNode.descendants().add(parentNode).edgesWith(parentNode.descendants());
+
+    // Use the .jsons() utility to get clean, serializable data objects
+    return subgraphElements.jsons();
+  }
+
+  /**
+   * ADVANCED QUERYING: Finds all 'note' nodes within a specific folder that have a high PageRank score
+   */
+  public findInfluentialNotesInFolder(folderId: string, minPageRank: number = 0.2): string[] {
+    if (!this.cy) return [];
+
+    // This selector is executed efficiently in the core engine
+    const influentialNodes = this.cy.nodes(`
+      node[type = "note"]
+      [parent = "${folderId}"]
+      [pageRank >= ${minPageRank}]
+    `);
+    
+    return influentialNodes.map(node => node.id());
+  }
+
+  /**
    * Perform advanced graph analysis with sophisticated centrality algorithms
    */
   public analyzeGraph(): GraphAnalysis | null {
@@ -416,22 +495,25 @@ export class CytoscapeGraphModel {
   }
 
   /**
-   * Export graph as JSON file
+   * UPGRADED: Export graph as JSON file using the built-in serializer
    */
-  public exportGraphJSON(graphData: CytoscapeGraphData, noteId?: string): string {
+  public exportGraphJSON(noteId?: string): string {
     const filename = noteId 
       ? `knowledge-graph-${noteId}-${Date.now()}.json`
       : `system-graph-${Date.now()}.json`;
-    
+
+    if (!this.cy) {
+      console.warn('[CytoscapeGraphModel] Cannot export, Cytoscape not initialized.');
+      // Fallback to original data if cy instance is gone
+      return JSON.stringify({ filename, graphData: this.graphData });
+    }
+
     const exportData = {
       filename,
       generated: new Date().toISOString(),
-      graphData,
+      // cy.elements().jsons() exports clean, serializable element data
       cytoscapeFormat: {
-        elements: [
-          ...graphData.nodes.map(node => ({ data: node.data })),
-          ...graphData.edges.map(edge => ({ data: edge.data }))
-        ]
+        elements: this.cy.elements().jsons()
       }
     };
 
