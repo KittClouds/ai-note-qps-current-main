@@ -1,3 +1,4 @@
+
 import { KokoroTTS } from 'kokoro-js';
 
 export interface TTSVoice {
@@ -23,7 +24,7 @@ class TTSService {
   private voices: TTSVoice[] = [];
   private initialized = false;
   private isCurrentlyPlaying = false;
-  private isPaused = false;
+  private isCurrentlyPaused = false;
 
   constructor() {
     this.setupVoices();
@@ -140,13 +141,13 @@ class TTSService {
       
       this.currentSource.onended = () => {
         this.isCurrentlyPlaying = false;
-        this.isPaused = false;
+        this.isCurrentlyPaused = false;
         this.currentSource = null;
       };
       
       this.currentSource.start();
       this.isCurrentlyPlaying = true;
-      this.isPaused = false;
+      this.isCurrentlyPaused = false;
     } catch (error) {
       console.error('Failed to play text:', error);
       throw error;
@@ -159,7 +160,7 @@ class TTSService {
     if (this.currentSource && this.isCurrentlyPlaying) {
       this.currentSource.stop();
       this.isCurrentlyPlaying = false;
-      this.isPaused = true;
+      this.isCurrentlyPaused = true;
     }
   }
 
@@ -167,7 +168,7 @@ class TTSService {
     // Since Web Audio API doesn't support resume, 
     // this would require re-implementing with more complex state management
     // For now, we'll just indicate it's not paused
-    this.isPaused = false;
+    this.isCurrentlyPaused = false;
   }
 
   stop(): void {
@@ -176,7 +177,7 @@ class TTSService {
       this.currentSource = null;
     }
     this.isCurrentlyPlaying = false;
-    this.isPaused = false;
+    this.isCurrentlyPaused = false;
   }
 
   getVoices(): TTSVoice[] {
@@ -188,7 +189,7 @@ class TTSService {
   }
 
   isPaused(): boolean {
-    return this.isPaused;
+    return this.isCurrentlyPaused;
   }
 }
 
