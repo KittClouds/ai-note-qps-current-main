@@ -1,4 +1,3 @@
-
 import { NEREntity, NERResult } from './nerServiceManager';
 
 // Comprehensive entity types with BIO tagging
@@ -76,6 +75,19 @@ export const NER_OUTPUT_SCHEMA = {
  */
 export class CoreNERService {
   
+  /**
+   * Create an empty NER result
+   */
+  public createEmptyResult(): NERResult {
+    return {
+      entities: [],
+      totalCount: 0,
+      entityTypes: {},
+      processingTime: 0,
+      textLength: 0
+    };
+  }
+
   /**
    * Generate standardized NER prompt for any provider
    */
