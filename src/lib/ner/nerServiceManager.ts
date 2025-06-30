@@ -3,6 +3,8 @@ import { GeminiAPIClient } from './apiClients/GeminiAPIClient';
 import { OpenRouterAPIClient } from './apiClients/OpenRouterAPIClient';
 import { winkNERService, WinkNEREntity, WinkNERResult, WinkNERStatus } from './winkService';
 import { coreNERService, NER_OUTPUT_SCHEMA } from './coreNERService';
+import { knowledgeGraphService, KNOWLEDGE_GRAPH_SCHEMA } from '../knowledge-graph/knowledgeGraphService';
+import { KnowledgeGraph } from '../knowledge-graph/types';
 
 export interface NEREntity {
   value: string;
@@ -93,6 +95,11 @@ export interface UnifiedNERResult {
   entityTypes: Record<string, number>;
   processingTime?: number;
   textLength?: number;
+  provider: NERProvider;
+}
+
+export interface UnifiedKnowledgeGraphResult {
+  knowledgeGraph: KnowledgeGraph;
   provider: NERProvider;
 }
 
@@ -195,6 +202,61 @@ class NERServiceManager {
       const result = await winkNERService.extractEntities(text);
       return {
         ...result,
+        provider: 'wink'
+      };
+    } else {
+      throw new Error(`Unknown provider: ${this.currentProvider}`);
+    }
+  }
+
+  /**
+   * Extract knowledge graph using the current provider
+   */
+  public async extractKnowledgeGraph(text: string): Promise<UnifiedKnowledgeGraphResult> {
+    if (!text?.trim()) {
+      const emptyGraph = knowledgeGraphService.createEmptyKnowledgeGraph();
+      return {
+        knowledgeGraph: emptyGraph,
+        provider: this.currentProvider
+      };
+    }
+
+    if (this.currentProvider === 'gemini') {
+      const prompt = knowledgeGraphService.generateKnowledgeGraphPrompt(text);
+      const rawData = await this.geminiClient.extractEntities(text, prompt, KNOWLEDGE_GRAPH_SCHEMA);
+      const knowledgeGraph = knowledgeGraphService.processKnowledgeGraph(rawData, text);
+      return {
+        knowledgeGraph,
+        provider: 'gemini'
+      };
+    } else if (this.currentProvider === 'openrouter') {
+      const prompt = knowledgeGraphService.generateKnowledgeGraphPrompt(text);
+      const rawData = await this.openRouterClient.extractEntities(text, prompt, KNOWLEDGE_GRAPH_SCHEMA);
+      const knowledgeGraph = knowledgeGraphService.processKnowledgeGraph(rawData, text);
+      return {
+        knowledgeGraph,
+        provider: 'openrouter'
+      };
+    } else if (this.currentProvider === 'wink') {
+      // For Wink, we'll use basic NER and create simple triples
+      const result = await winkNERService.extractEntities(text);
+      const knowledgeGraph: KnowledgeGraph = {
+        entities: result.entities.map(entity => ({
+          id: `entity_${Math.random().toString(36).substr(2, 9)}`,
+          value: entity.value,
+          type: entity.type,
+          confidence: entity.confidence,
+          start: entity.start,
+          end: entity.end
+        })),
+        triples: [], // Wink doesn't support relationship extraction
+        totalEntities: result.entities.length,
+        totalTriples: 0,
+        processingTime: result.processingTime,
+        textLength: result.textLength
+      };
+      return {
+        knowledgeGraph,
         provider: 'wink'
       };
     } else {

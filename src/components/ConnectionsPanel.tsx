@@ -8,6 +8,7 @@ import { ParsedConnections } from '@/utils/parsingUtils';
 import { nerServiceManager, AVAILABLE_NER_MODELS, UnifiedModelInfo, UnifiedNERResult } from '@/lib/ner/nerServiceManager';
 import { extractTextFromNoteContent } from '@/lib/ner/textProcessing';
 import { useToast } from '@/hooks/use-toast';
+import { KnowledgeGraphTab } from './knowledge-graph/KnowledgeGraphTab';
 
 interface ConnectionsPanelProps {
   connections: (ParsedConnections & { crosslinks?: Array<{ noteId: string; label: string }> }) | null;
@@ -238,8 +239,12 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
         
         <CollapsibleContent className="border-t">
           <div className="p-4 space-y-4">
-            <Tabs defaultValue="crosslinks" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+            <Tabs defaultValue="knowledge-graph" className="w-full">
+              <TabsList className="grid w-full grid-cols-6">
+                <TabsTrigger value="knowledge-graph" className="flex items-center gap-1">
+                  <Brain className="h-3 w-3" />
+                  Knowledge
+                </TabsTrigger>
                 <TabsTrigger value="crosslinks" className="flex items-center gap-1">
                   <GitBranch className="h-3 w-3" />
                   Cross ({crosslinkCount})
@@ -257,10 +262,14 @@ const ConnectionsPanel = ({ connections, selectedNote, isOpen, onToggle }: Conne
                   Related ({tripleCount})
                 </TabsTrigger>
                 <TabsTrigger value="ner" className="flex items-center gap-1">
-                  <Brain className="h-3 w-3" />
+                  <AtSign className="h-3 w-3" />
                   NER ({showNerEntities ? nerEntityCount : 0})
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="knowledge-graph" className="mt-4">
+                <KnowledgeGraphTab selectedNote={selectedNote} />
+              </TabsContent>
 
               <TabsContent value="ner" className="mt-4">
                 <div className="space-y-4">
