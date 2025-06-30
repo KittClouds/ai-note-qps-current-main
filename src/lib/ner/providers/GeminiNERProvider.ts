@@ -1,5 +1,5 @@
 
-import { NEREntity, NERResult, NERStatus } from '../nerServiceManager';
+import { NERResult, NERStatus } from '../nerServiceManager';
 import { GeminiAPIClient } from '../apiClients/GeminiAPIClient';
 import { coreNERService, NER_OUTPUT_SCHEMA } from '../coreNERService';
 
@@ -32,21 +32,12 @@ export class GeminiNERProvider {
   }
 
   public async extractEntities(text: string): Promise<NERResult> {
-    const startTime = Date.now();
-    
     console.log('[GeminiNER] Starting entity extraction');
     console.log('[GeminiNER] Input text length:', text?.length || 0);
 
     // Validate input
     if (!text?.trim()) {
-      console.warn('[GeminiNER] Empty or invalid text input');
-      return {
-        entities: [],
-        totalCount: 0,
-        entityTypes: {},
-        processingTime: Date.now() - startTime,
-        textLength: 0
-      };
+      return coreNERService.createEmptyResult();
     }
 
     // Generate standardized prompt using core service
@@ -113,5 +104,4 @@ export class GeminiNERProvider {
   }
 }
 
-// Export singleton instance
 export const geminiNERProvider = new GeminiNERProvider();
