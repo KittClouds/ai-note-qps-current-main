@@ -169,7 +169,7 @@ export const KnowledgeGraphTab: React.FC<KnowledgeGraphTabProps> = ({ selectedNo
           {selectedNote ? (
             <Button 
               onClick={handleGenerateKnowledgeGraph}
-              disabled={state.view === 'loading'}
+              disabled={false}
               className="bg-purple-600 hover:bg-purple-700 text-white"
             >
               <Brain className="h-4 w-4 mr-2" />
