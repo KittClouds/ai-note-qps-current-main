@@ -125,6 +125,9 @@ export class NERServiceManager {
     console.log('[NERManager] Service manager initialized with Gemini, OpenRouter, and Wink');
     this.geminiClient = new GeminiAPIClient(this.currentModelId);
     this.openRouterClient = new OpenRouterAPIClient(OPENROUTER_NER_MODELS[0].id);
+    
+    // Initialize currentAPIClient to match the default provider
+    this.currentAPIClient = this.geminiClient;
   }
 
   /**
@@ -166,6 +169,7 @@ export class NERServiceManager {
       this.currentAPIClient = this.openRouterClient;
     } else if (this.currentProvider === 'wink') {
       // Wink only has one model, so just ensure it's initialized
+      this.currentAPIClient = null; // Wink doesn't use API clients
       if (!winkNERService.isInitialized() && !winkNERService.isLoading()) {
         await winkNERService.reinitialize();
       }
@@ -217,8 +221,13 @@ export class NERServiceManager {
   public async extractKnowledgeGraph(text: string): Promise<{ knowledgeGraph: KnowledgeGraph }> {
     console.log('[NERServiceManager] Starting knowledge graph extraction');
     
-    if (!this.isReady()) {
-      await this.initialize();
+    if (this.currentProvider === 'wink') {
+      // Wink provider doesn't support knowledge graph extraction yet
+      throw new Error('Knowledge graph extraction is not supported with the Wink provider');
+    }
+    
+    if (!this.currentAPIClient) {
+      throw new Error('API client not properly initialized for knowledge graph extraction');
     }
 
     const startTime = Date.now();
@@ -228,7 +237,7 @@ export class NERServiceManager {
       console.log('[NERServiceManager] Generated prompt for knowledge graph');
 
       // Use the API client to extract the knowledge graph
-      const rawEntities = await this.currentAPIClient!.extractEntities(
+      const rawEntities = await this.currentAPIClient.extractEntities(
         text, 
         prompt, 
         KNOWLEDGE_GRAPH_SCHEMA
@@ -367,14 +376,19 @@ export class NERServiceManager {
   }
 
   private isReady(): boolean {
-    return this.currentAPIClient !== null;
+    if (this.currentProvider === 'wink') {
+      return winkNERService.isInitialized();
+    }
+    return this.currentAPIClient !== null && this.isInitialized();
   }
 
   private async initialize(): Promise<void> {
     if (this.currentProvider === 'gemini') {
-      await this.geminiClient.initialize();
+      this.geminiClient.initialize();
+      this.currentAPIClient = this.geminiClient;
     } else if (this.currentProvider === 'openrouter') {
-      await this.openRouterClient.initialize();
+      this.openRouterClient.initialize();
+      this.currentAPIClient = this.openRouterClient;
     }
   }
 }
