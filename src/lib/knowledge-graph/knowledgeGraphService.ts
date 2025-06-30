@@ -1,6 +1,9 @@
-
 import { KnowledgeGraph, KnowledgeEntity, KnowledgeTriple, EntityFactSheet } from './types';
 import { coreNERService } from '../ner/coreNERService';
+import { graphFileService } from './graphFileService';
+import { cytoscapeGraphModel } from './cytoscapeGraphModel';
+import { Note } from '@/types/notes';
+import { ParsedConnections } from '@/utils/parsingUtils';
 
 export const KNOWLEDGE_GRAPH_SCHEMA = {
   type: 'object',
@@ -79,9 +82,14 @@ Return the results as a structured JSON object with "entities" and "triples" arr
   }
 
   /**
-   * Process raw knowledge graph data
+   * Process raw knowledge graph data and generate computational graph
    */
-  public processKnowledgeGraph(rawData: any, originalText: string): KnowledgeGraph {
+  public async processKnowledgeGraph(
+    rawData: any, 
+    originalText: string, 
+    note?: Note,
+    connections?: ParsedConnections & { crosslinks: Array<{ noteId: string; label: string }> }
+  ): Promise<KnowledgeGraph> {
     const startTime = Date.now();
     
     console.log('[KnowledgeGraph] Processing raw data:', rawData);
@@ -120,10 +128,7 @@ Return the results as a structured JSON object with "entities" and "triples" arr
 
     const processingTime = Date.now() - startTime;
     
-    console.log(`[KnowledgeGraph] Processing completed in ${processingTime}ms`);
-    console.log(`[KnowledgeGraph] Found ${entities.length} entities and ${triples.length} triples`);
-    
-    return {
+    const knowledgeGraph: KnowledgeGraph = {
       entities,
       triples,
       totalEntities: entities.length,
@@ -131,6 +136,21 @@ Return the results as a structured JSON object with "entities" and "triples" arr
       processingTime,
       textLength: originalText.length
     };
+
+    // Generate computational graph file if note and connections are provided
+    if (note && connections) {
+      try {
+        await graphFileService.generateNoteGraphFile(note, knowledgeGraph, connections);
+        console.log('[KnowledgeGraph] Computational graph file generated for note:', note.title);
+      } catch (error) {
+        console.error('[KnowledgeGraph] Failed to generate graph file:', error);
+      }
+    }
+    
+    console.log(`[KnowledgeGraph] Processing completed in ${processingTime}ms`);
+    console.log(`[KnowledgeGraph] Found ${entities.length} entities and ${triples.length} triples`);
+    
+    return knowledgeGraph;
   }
 
   /**

@@ -4,6 +4,7 @@ import { winkNERService, WinkNEREntity, WinkNERResult, WinkNERStatus } from './w
 import { coreNERService, NER_OUTPUT_SCHEMA } from './coreNERService';
 import { knowledgeGraphService, KNOWLEDGE_GRAPH_SCHEMA } from '../knowledge-graph/knowledgeGraphService';
 import { KnowledgeGraph } from '../knowledge-graph/types';
+import { graphFileService } from '../knowledge-graph/graphFileService';
 
 export interface NEREntity {
   value: string;
@@ -100,6 +101,7 @@ export interface UnifiedNERResult {
 export interface UnifiedKnowledgeGraphResult {
   knowledgeGraph: KnowledgeGraph;
   provider: NERProvider;
+  graphFileGenerated?: boolean;
 }
 
 export interface UnifiedNERStatus {
@@ -216,9 +218,13 @@ export class NERServiceManager {
   }
 
   /**
-   * Extract knowledge graph using the current provider
+   * Extract knowledge graph using the current provider with computational graph generation
    */
-  public async extractKnowledgeGraph(text: string): Promise<{ knowledgeGraph: KnowledgeGraph }> {
+  public async extractKnowledgeGraph(
+    text: string, 
+    note?: any, 
+    connections?: any
+  ): Promise<UnifiedKnowledgeGraphResult> {
     console.log('[NERServiceManager] Starting knowledge graph extraction');
     
     if (this.currentProvider === 'wink') {
@@ -263,13 +269,27 @@ export class NERServiceManager {
         knowledgeGraphData = rawEntities;
       }
 
-      const knowledgeGraph = knowledgeGraphService.processKnowledgeGraph(knowledgeGraphData, text);
+      // Process knowledge graph and generate computational graph
+      const knowledgeGraph = await knowledgeGraphService.processKnowledgeGraph(
+        knowledgeGraphData, 
+        text, 
+        note, 
+        connections
+      );
+      
       const processingTime = Date.now() - startTime;
 
       console.log(`[NERServiceManager] Knowledge graph extraction completed in ${processingTime}ms`);
       console.log(`[NERServiceManager] Found ${knowledgeGraph.totalEntities} entities and ${knowledgeGraph.totalTriples} triples`);
 
-      return { knowledgeGraph };
+      // Check if computational graph file was generated
+      const graphFileGenerated = note && connections;
+
+      return { 
+        knowledgeGraph, 
+        provider: this.currentProvider,
+        graphFileGenerated: !!graphFileGenerated
+      };
     } catch (error) {
       console.error('[NERServiceManager] Error during knowledge graph extraction:', error);
       throw new Error(`Knowledge graph extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
