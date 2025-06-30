@@ -52,7 +52,7 @@ function NotesApp() {
           <div className="min-h-screen flex w-full bg-background">
             <AppSidebar />
             <SidebarInset className="flex flex-col transition-all duration-200 ease-linear">
-              <LayoutSizer forHeader={true} asChild>
+              <LayoutSizer forHeader={true}>
                 <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
                   <SidebarTrigger className="-ml-1" />
                   <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
