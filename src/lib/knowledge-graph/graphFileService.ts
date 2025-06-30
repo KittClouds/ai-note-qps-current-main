@@ -143,7 +143,7 @@ export class GraphFileService {
     const exportData = {
       ...graphFile,
       exportedAt: new Date().toISOString(),
-      cytoscapeFormat: cytoscapeGraphModel.exportGraphJSON(graphFile.graphData, graphFile.noteId)
+      cytoscapeFormat: cytoscapeGraphModel.exportGraphJSON(graphFile.noteId)
     };
 
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });

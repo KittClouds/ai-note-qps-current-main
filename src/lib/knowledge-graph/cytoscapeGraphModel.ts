@@ -1,4 +1,3 @@
-
 import cytoscape, { Core, ElementDefinition, NodeDefinition, EdgeDefinition } from 'cytoscape';
 import { KnowledgeGraph, KnowledgeEntity, KnowledgeTriple } from './types';
 import { Note, Folder, FileSystemItem } from '@/types/notes';
@@ -285,7 +284,10 @@ export class CytoscapeGraphModel {
     const subgraphElements = parentNode.descendants().add(parentNode).edgesWith(parentNode.descendants());
 
     // Use the .jsons() utility to get clean, serializable data objects
-    return subgraphElements.jsons();
+    const jsons = subgraphElements.jsons();
+    const nodes = jsons.filter((item: any) => item.data.source === undefined && item.data.target === undefined);
+    const edges = jsons.filter((item: any) => item.data.source !== undefined && item.data.target !== undefined);
+    return { nodes, edges };
   }
 
   /**
