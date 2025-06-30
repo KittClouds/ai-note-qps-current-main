@@ -372,8 +372,15 @@ export class CytoscapeGraphModel {
     const connectedEdges = selectedNodes.connectedEdges();
 
     const nodes = this.graphData.nodes.filter(node => nodeIds.includes(node.data.id));
+    
+    // Fixed edge filtering - properly get edge IDs from Cytoscape collection
+    const edgeIds: string[] = [];
+    connectedEdges.forEach(cyEdge => {
+      edgeIds.push(cyEdge.id());
+    });
+    
     const edges = this.graphData.edges.filter(edge => 
-      connectedEdges.some(cyEdge => cyEdge.id() === edge.data.id)
+      edgeIds.includes(edge.data.id)
     );
 
     return {
