@@ -223,10 +223,10 @@ export class CytoscapeGraphModel {
       return null;
     }
 
-    // Calculate centrality
+    // Calculate centrality - fixed to pass includeLoops parameter
     const centralNodes = this.cy.nodes().map(node => ({
       id: node.id(),
-      centrality: node.degree()
+      centrality: node.degree(false) // false means don't include loops
     })).sort((a, b) => b.centrality - a.centrality);
 
     // Simple clustering based on node types
@@ -237,7 +237,9 @@ export class CytoscapeGraphModel {
       clusters,
       pathsBetween: (source: string, target: string) => {
         if (!this.cy) return [];
-        const path = this.cy.elements().dijkstra(`#${source}`).pathTo(`#${target}`);
+        // Fixed dijkstra API usage
+        const dijkstra = this.cy.elements().dijkstra({ root: `#${source}` });
+        const path = dijkstra.pathTo(this.cy.$(`#${target}`));
         return path.nodes().map(node => node.id());
       },
       subgraph: (nodeIds: string[]) => this.extractSubgraph(nodeIds)
@@ -346,6 +348,7 @@ export class CytoscapeGraphModel {
 
     const typeGroups: Record<string, string[]> = {};
     
+    // Fixed node iteration - use forEach instead of .map().id()
     this.cy.nodes().forEach(node => {
       const type = node.data('type');
       if (!typeGroups[type]) {

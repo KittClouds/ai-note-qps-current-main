@@ -1,3 +1,4 @@
+
 import { CytoscapeGraphData, cytoscapeGraphModel } from './cytoscapeGraphModel';
 import { KnowledgeGraph } from './types';
 import { Note, FileSystemItem } from '@/types/notes';
@@ -66,8 +67,8 @@ export class GraphFileService {
       type: 'system-graph'
     };
 
-    // Save system graph separately
-    localStorage.setItem(this.SYSTEM_GRAPH_KEY, JSON.stringify(graphFile));
+    // Save system graph separately - fixed static property access
+    localStorage.setItem(GraphFileService.SYSTEM_GRAPH_KEY, JSON.stringify(graphFile));
     
     console.log('[GraphFileService] System graph file generated:', filename);
     return graphFile;
@@ -90,12 +91,12 @@ export class GraphFileService {
             .slice(0, 10);
           
           const otherFiles = existingFiles.filter(f => f.noteId !== graphFile.noteId);
-          localStorage.setItem(this.STORAGE_KEY, JSON.stringify([...otherFiles, ...filesToKeep]));
+          localStorage.setItem(GraphFileService.STORAGE_KEY, JSON.stringify([...otherFiles, ...filesToKeep]));
         } else {
-          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(existingFiles));
+          localStorage.setItem(GraphFileService.STORAGE_KEY, JSON.stringify(existingFiles));
         }
       } else {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(existingFiles));
+        localStorage.setItem(GraphFileService.STORAGE_KEY, JSON.stringify(existingFiles));
       }
     } catch (error) {
       console.error('[GraphFileService] Failed to save graph file:', error);
@@ -107,7 +108,7 @@ export class GraphFileService {
    */
   public getStoredGraphFiles(): GraphFile[] {
     try {
-      const stored = localStorage.getItem(this.STORAGE_KEY);
+      const stored = localStorage.getItem(GraphFileService.STORAGE_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
       console.error('[GraphFileService] Failed to load graph files:', error);
@@ -127,7 +128,7 @@ export class GraphFileService {
    */
   public getLatestSystemGraph(): GraphFile | null {
     try {
-      const stored = localStorage.getItem(this.SYSTEM_GRAPH_KEY);
+      const stored = localStorage.getItem(GraphFileService.SYSTEM_GRAPH_KEY);
       return stored ? JSON.parse(stored) : null;
     } catch (error) {
       console.error('[GraphFileService] Failed to load system graph:', error);
@@ -166,7 +167,7 @@ export class GraphFileService {
     try {
       const existingFiles = this.getStoredGraphFiles();
       const updatedFiles = existingFiles.filter(file => file.id !== fileId);
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedFiles));
+      localStorage.setItem(GraphFileService.STORAGE_KEY, JSON.stringify(updatedFiles));
       console.log('[GraphFileService] Graph file deleted:', fileId);
     } catch (error) {
       console.error('[GraphFileService] Failed to delete graph file:', error);
