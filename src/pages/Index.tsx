@@ -52,32 +52,34 @@ function NotesApp() {
           <div className="min-h-screen flex w-full bg-background">
             <AppSidebar />
             <SidebarInset className="flex flex-col transition-all duration-200 ease-linear">
-              <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
-                <SidebarTrigger className="-ml-1" />
-                <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    <BreadcrumbItem className="hidden md:block">
-                      <BreadcrumbLink href="#" className="text-foreground hover:text-primary">Notes</BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator className="hidden md:block" />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage className="text-foreground">
-                        {selectedNote ? selectedNote.title : 'Select a note'}
-                      </BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </BreadcrumbList>
-                </Breadcrumb>
-                <div className="ml-auto flex items-center gap-2">
-                  <Button variant="ghost" size="icon" onClick={handleToggleToolbar} title={toolbarVisible ? 'Hide toolbar (Ctrl+\\)' : 'Show toolbar (Ctrl+\\)'} className="h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors px-0">
-                    <Menu className="h-4 w-4" />
-                  </Button>
-                  <ThemeToggle />
-                  <APISettingsModal />
-                  <EntityManagerDrawer />
-                  <RightSidebarTrigger />
-                </div>
-              </header>
+              <LayoutSizer forHeader={true} asChild>
+                <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
+                  <SidebarTrigger className="-ml-1" />
+                  <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem className="hidden md:block">
+                        <BreadcrumbLink href="#" className="text-foreground hover:text-primary">Notes</BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator className="hidden md:block" />
+                      <BreadcrumbItem>
+                        <BreadcrumbPage className="text-foreground">
+                          {selectedNote ? selectedNote.title : 'Select a note'}
+                        </BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button variant="ghost" size="icon" onClick={handleToggleToolbar} title={toolbarVisible ? 'Hide toolbar (Ctrl+\\)' : 'Show toolbar (Ctrl+\\)'} className="h-8 w-8 hover:bg-accent hover:text-accent-foreground transition-colors px-0">
+                      <Menu className="h-4 w-4" />
+                    </Button>
+                    <ThemeToggle />
+                    <APISettingsModal />
+                    <EntityManagerDrawer />
+                    <RightSidebarTrigger />
+                  </div>
+                </header>
+              </LayoutSizer>
               
               <LayoutSizer className="flex-1 flex flex-col min-h-0" includeConnections={connectionsOpen} includeToolbar={toolbarVisible}>
                 {selectedNote ? (

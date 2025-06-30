@@ -9,6 +9,7 @@ interface LayoutSizerProps {
   className?: string;
   includeConnections?: boolean;
   includeToolbar?: boolean;
+  forHeader?: boolean;
   style?: React.CSSProperties;
 }
 
@@ -17,15 +18,16 @@ export function LayoutSizer({
   className = '', 
   includeConnections = false,
   includeToolbar = false,
+  forHeader = false,
   style = {},
   ...props 
 }: LayoutSizerProps) {
-  const dimensions = useLayoutDimensions({ includeConnections, includeToolbar });
+  const dimensions = useLayoutDimensions({ includeConnections, includeToolbar, forHeader });
   const isMobile = useIsMobile();
   const { open: rightSidebarOpen } = useRightSidebar();
 
-  // On desktop, don't set width when right sidebar is open since it uses its own spacer
-  const shouldSetWidth = isMobile || !rightSidebarOpen;
+  // On desktop, don't set width when right sidebar is open and we're not calculating for header
+  const shouldSetWidth = isMobile || !rightSidebarOpen || forHeader;
 
   return (
     <div 

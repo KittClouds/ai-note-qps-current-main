@@ -42,11 +42,13 @@ export function calculateAvailableWidth(options: {
   leftSidebarOpen?: boolean;
   rightSidebarOpen?: boolean;
   isMobile?: boolean;
+  forHeader?: boolean;
 } = {}): string {
   const {
     leftSidebarOpen = true,
     rightSidebarOpen = true,
-    isMobile = false
+    isMobile = false,
+    forHeader = false
   } = options;
 
   // On mobile, sidebars are overlays, so use full width
@@ -54,11 +56,15 @@ export function calculateAvailableWidth(options: {
     return '100%';
   }
 
-  // Only account for left sidebar width since right sidebar handles its own spacing
   let totalSidebarWidth = 0;
   
   if (leftSidebarOpen) {
     totalSidebarWidth += LAYOUT_CONSTANTS.LEFT_SIDEBAR_WIDTH;
+  }
+
+  // For header calculations, we need to account for both sidebars
+  if (forHeader && rightSidebarOpen) {
+    totalSidebarWidth += LAYOUT_CONSTANTS.RIGHT_SIDEBAR_WIDTH;
   }
 
   return totalSidebarWidth > 0 
@@ -72,6 +78,7 @@ export function getLayoutDimensions(options: {
   leftSidebarOpen?: boolean;
   rightSidebarOpen?: boolean;
   isMobile?: boolean;
+  forHeader?: boolean;
 }): LayoutDimensions {
   return {
     availableHeight: calculateAvailableHeight(options),

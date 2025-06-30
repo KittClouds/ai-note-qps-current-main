@@ -8,6 +8,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 interface UseLayoutDimensionsOptions {
   includeConnections?: boolean;
   includeToolbar?: boolean;
+  forHeader?: boolean;
 }
 
 export function useLayoutDimensions(options: UseLayoutDimensionsOptions = {}) {
@@ -46,6 +47,7 @@ export function useLayoutDimensions(options: UseLayoutDimensionsOptions = {}) {
   }, [
     options.includeConnections, 
     options.includeToolbar, 
+    options.forHeader,
     leftSidebarOpen, 
     rightSidebarOpen,
     isMobile
