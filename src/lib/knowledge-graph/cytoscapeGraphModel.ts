@@ -239,15 +239,20 @@ export class CytoscapeGraphModel {
     // Advanced Centrality Analysis
     const pageRank = this.cy.elements().pageRank({ dampingFactor: 0.85 });
     const betweenness = this.cy.elements().betweennessCentrality({ directed: false });
-    const closeness = this.cy.elements().closenessCentrality({ directed: false });
-
-    const centralNodes: AdvancedCentralityMetrics[] = this.cy.nodes().map(node => ({
-      id: node.id(),
-      degree: node.degree(false),
-      pageRank: pageRank.rank(node),
-      betweenness: betweenness.betweenness(node),
-      closeness: closeness.closeness(node)
-    }))
+    
+    // Fix: Closeness centrality requires computation for each node individually
+    const centralNodes: AdvancedCentralityMetrics[] = this.cy.nodes().map(node => {
+      // Compute closeness centrality for this specific node as root
+      const closenessResult = this.cy!.elements().closenessCentrality({ root: node, directed: false });
+      
+      return {
+        id: node.id(),
+        degree: node.degree(false),
+        pageRank: pageRank.rank(node),
+        betweenness: betweenness.betweenness(node),
+        closeness: closenessResult.closeness(node) // Access closeness for this node
+      };
+    })
     .sort((a, b) => b.pageRank - a.pageRank); // Sort by influence (PageRank)
 
     // Enhanced clustering - fallback to type-based if community detection not available
@@ -263,7 +268,7 @@ export class CytoscapeGraphModel {
       clusters,
       pathsBetween: (source: string, target: string) => {
         if (!this.cy) return [];
-        const dijkstra = this.cy.elements().dijkstra({ root: `#${source}` });
+        const dijkstra = this.cy.elements().dijkstra({ root: this.cy.$(`#${source}`) });
         const path = dijkstra.pathTo(this.cy.$(`#${target}`));
         return path.nodes().map(node => node.id());
       },
