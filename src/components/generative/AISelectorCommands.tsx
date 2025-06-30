@@ -32,35 +32,19 @@ interface AISelectorCommandsProps {
 }
 
 const AISelectorCommands = ({ onSelect }: AISelectorCommandsProps) => {
-  const { editor, isReady } = useEditor();
+  const { editor } = useEditor();
 
-  if (!editor || !isReady) return null;
-
-  const handleOptionSelect = (value: string) => {
-    try {
-      const text = getSelectedText(editor);
-      onSelect(text, value);
-    } catch (error) {
-      console.warn('Failed to get selected text:', error);
-    }
-  };
-
-  const handleContinue = () => {
-    try {
-      const pos = editor.state.selection.from;
-      const text = getPrevText(editor, pos);
-      onSelect(text, "continue");
-    } catch (error) {
-      console.warn('Failed to get previous text:', error);
-    }
-  };
+  if (!editor) return null;
 
   return (
     <>
       <CommandGroup heading="Edit or review selection">
         {options.map((option) => (
           <CommandItem
-            onSelect={() => handleOptionSelect(option.value)}
+            onSelect={(value) => {
+              const text = getSelectedText(editor);
+              onSelect(text, value);
+            }}
             className="flex gap-2 px-4"
             key={option.value}
             value={option.value}
@@ -73,7 +57,11 @@ const AISelectorCommands = ({ onSelect }: AISelectorCommandsProps) => {
       <CommandSeparator />
       <CommandGroup heading="Use AI to do more">
         <CommandItem
-          onSelect={handleContinue}
+          onSelect={() => {
+            const pos = editor.state.selection.from;
+            const text = getPrevText(editor, pos);
+            onSelect(text, "continue");
+          }}
           value="continue"
           className="gap-2 px-4"
         >

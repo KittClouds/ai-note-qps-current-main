@@ -9,41 +9,9 @@ interface AICompletionCommandsProps {
 }
 
 const AICompletionCommands = ({ completion, onDiscard }: AICompletionCommandsProps) => {
-  const { editor, isReady } = useEditor();
+  const { editor } = useEditor();
   
-  if (!editor || !isReady) return null;
-
-  const handleReplace = () => {
-    try {
-      const selection = editor.view.state.selection;
-      editor
-        .chain()
-        .focus()
-        .insertContentAt(
-          {
-            from: selection.from,
-            to: selection.to,
-          },
-          completion,
-        )
-        .run();
-    } catch (error) {
-      console.warn('Failed to replace content:', error);
-    }
-  };
-
-  const handleInsert = () => {
-    try {
-      const selection = editor.view.state.selection;
-      editor
-        .chain()
-        .focus()
-        .insertContentAt(selection.to + 1, completion)
-        .run();
-    } catch (error) {
-      console.warn('Failed to insert content:', error);
-    }
-  };
+  if (!editor) return null;
 
   return (
     <>
@@ -51,7 +19,20 @@ const AICompletionCommands = ({ completion, onDiscard }: AICompletionCommandsPro
         <CommandItem
           className="gap-2 px-4"
           value="replace"
-          onSelect={handleReplace}
+          onSelect={() => {
+            const selection = editor.view.state.selection;
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(
+                {
+                  from: selection.from,
+                  to: selection.to,
+                },
+                completion,
+              )
+              .run();
+          }}
         >
           <Check className="h-4 w-4 text-muted-foreground" />
           Replace selection
@@ -59,7 +40,14 @@ const AICompletionCommands = ({ completion, onDiscard }: AICompletionCommandsPro
         <CommandItem
           className="gap-2 px-4"
           value="insert"
-          onSelect={handleInsert}
+          onSelect={() => {
+            const selection = editor.view.state.selection;
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(selection.to + 1, completion)
+              .run();
+          }}
         >
           <TextQuote className="h-4 w-4 text-muted-foreground" />
           Insert below

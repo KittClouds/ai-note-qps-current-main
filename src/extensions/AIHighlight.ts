@@ -113,29 +113,14 @@ export const AIHighlight = Mark.create<AIHighlightOptions>({
 });
 
 export const removeAIHighlight = (editor: Editor) => {
-  if (!editor || !editor.isEditable || editor.isDestroyed) {
-    return;
-  }
-  
-  try {
-    editor.chain().focus().unsetAIHighlight().run();
-  } catch (error) {
-    console.warn('Failed to remove AI highlight:', error);
-  }
+  const tr = editor.state.tr;
+  tr.removeMark(0, editor.state.doc.nodeSize - 2, editor.state.schema.marks["ai-highlight"]);
+  editor.view.dispatch(tr);
 };
 
 export const addAIHighlight = (editor: Editor, color?: string) => {
-  if (!editor || !editor.isEditable || editor.isDestroyed) {
-    return;
-  }
-  
-  try {
-    editor
-      .chain()
-      .focus()
-      .setAIHighlight({ color: color ?? "#c1ecf970" })
-      .run();
-  } catch (error) {
-    console.warn('Failed to add AI highlight:', error);
-  }
+  editor
+    .chain()
+    .setAIHighlight({ color: color ?? "#c1ecf970" })
+    .run();
 };
