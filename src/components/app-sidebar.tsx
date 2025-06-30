@@ -1,6 +1,6 @@
 
 import * as React from "react";
-import { Plus, FolderPlus, CheckSquare, Settings, Volume2 } from "lucide-react";
+import { Plus, FolderPlus, CheckSquare, Settings } from "lucide-react";
 import { Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarMenu, SidebarRail, SidebarHeader } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { FileTreeItem } from "./FileTreeItem";
@@ -8,10 +8,8 @@ import { BulkActionsToolbar } from "./BulkActionsToolbar";
 import { EnhancedSearchBar } from "./EnhancedSearchBar";
 import { UndoRedoToolbar } from "./UndoRedoToolbar";
 import { SystemStatusModal } from "./SystemStatusModal";
-import { TTSControls } from "./tts/TTSControls";
 import { useNotes } from "@/contexts/LiveStoreNotesContext";
 import { useBulkSelection } from "@/contexts/BulkSelectionContext";
-import { prepareNoteForTTS } from "@/lib/tts/textProcessing";
 import { useState } from "react";
 import { Note } from "@/types/notes";
 
@@ -24,8 +22,7 @@ export function AppSidebar({
     getItemsByParent,
     state,
     selectItem,
-    getSystemStatus,
-    selectedNote
+    getSystemStatus
   } = useNotes();
   const {
     isSelectionMode,
@@ -35,28 +32,17 @@ export function AppSidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const rootItems = getItemsByParent(); // Items without a parent
   const [showSystemStatus, setShowSystemStatus] = useState(false);
-  const [showTTS, setShowTTS] = useState(false);
 
   // Get all notes from the state for search functionality
   const allNotes = state.items.filter(item => item.type === 'note') as Note[];
 
   // Filter items based on search query for text search
   const filteredItems = searchQuery.trim() ? rootItems.filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()) || item.type === 'note' && item.content.toLowerCase().includes(searchQuery.toLowerCase())) : rootItems;
-  
   const handleNoteSelect = (noteId: string) => {
     selectItem(noteId);
     setSearchQuery(""); // Clear search when selecting a note
   };
-  
   const allItemIds = state.items.map(item => item.id);
-
-  const handleTTSToggle = () => {
-    setShowTTS(!showTTS);
-  };
-
-  // Prepare text for TTS from current note
-  const ttsText = selectedNote ? prepareNoteForTTS(selectedNote.content) : '';
-
   return <Sidebar {...props}>
       <SidebarHeader className="border-b">
         <div className="flex items-center justify-between p-2">
@@ -72,16 +58,6 @@ export function AppSidebar({
                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={enterSelectionMode} title="Bulk Select">
                   <CheckSquare className="h-4 w-4" />
                 </Button>
-                <Button 
-                  size="sm" 
-                  variant="ghost" 
-                  className="h-8 w-8 p-0" 
-                  onClick={handleTTSToggle} 
-                  title="Read Aloud"
-                  disabled={!selectedNote}
-                >
-                  <Volume2 className="h-4 w-4" />
-                </Button>
                 <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setShowSystemStatus(true)} title="System Status">
                   <Settings className="h-4 w-4" />
                 </Button>
@@ -89,15 +65,6 @@ export function AppSidebar({
           </div>
         </div>
         <UndoRedoToolbar />
-        
-        {showTTS && selectedNote && (
-          <div className="p-2">
-            <TTSControls 
-              text={ttsText}
-              onClose={() => setShowTTS(false)}
-            />
-          </div>
-        )}
       </SidebarHeader>
       <SidebarContent className="mx-0">
         {isSelectionMode && <BulkActionsToolbar allItemIds={allItemIds} />}
