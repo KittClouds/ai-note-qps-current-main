@@ -1,4 +1,3 @@
-
 import { KokoroTTS } from 'kokoro-js';
 
 export interface TTSVoice {
@@ -19,9 +18,12 @@ export interface TTSState {
 
 class TTSService {
   private tts: any = null;
-  private currentAudio: HTMLAudioElement | null = null;
+  private audioContext: AudioContext | null = null;
+  private currentSource: AudioBufferSourceNode | null = null;
   private voices: TTSVoice[] = [];
   private initialized = false;
+  private isCurrentlyPlaying = false;
+  private isPaused = false;
 
   constructor() {
     this.setupVoices();
@@ -71,6 +73,10 @@ class TTSService {
       this.tts = await KokoroTTS.from_pretrained(model_id, {
         dtype: "q8",
       });
+      
+      // Initialize Web Audio API
+      this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
       this.initialized = true;
     } catch (error) {
       console.error('Failed to initialize TTS:', error);
@@ -78,7 +84,7 @@ class TTSService {
     }
   }
 
-  async generateSpeech(text: string, voice: string = 'af_bella'): Promise<Blob> {
+  async generateSpeech(text: string, voice: string = 'af_bella'): Promise<AudioBuffer> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -86,20 +92,27 @@ class TTSService {
     try {
       const audio = await this.tts.generate(text, { voice });
       
-      // Convert the audio data to a proper Blob
-      let audioData;
+      // Get the raw audio data
+      let audioData: Float32Array;
       if (audio.data instanceof ArrayBuffer) {
-        audioData = new Uint8Array(audio.data);
+        audioData = new Float32Array(audio.data);
+      } else if (audio.data instanceof Float32Array) {
+        audioData = audio.data;
       } else if (audio.data instanceof Uint8Array) {
-        audioData = audio.data;
+        // Convert Uint8Array to Float32Array
+        audioData = new Float32Array(audio.data.length);
+        for (let i = 0; i < audio.data.length; i++) {
+          audioData[i] = (audio.data[i] - 128) / 128.0; // Convert from 0-255 to -1 to 1
+        }
       } else {
-        // If it's already a Blob or has a different format
-        audioData = audio.data;
+        throw new Error('Unsupported audio data format');
       }
+
+      // Create AudioBuffer from the raw audio data
+      const audioBuffer = this.audioContext!.createBuffer(1, audioData.length, audio.sampleRate || 24000);
+      audioBuffer.copyToChannel(audioData, 0);
       
-      // Create a proper audio Blob
-      const audioBlob = new Blob([audioData], { type: 'audio/wav' });
-      return audioBlob;
+      return audioBuffer;
     } catch (error) {
       console.error('Failed to generate speech:', error);
       throw new Error('Failed to generate speech');
@@ -110,15 +123,30 @@ class TTSService {
     try {
       this.stop(); // Stop any current playback
       
-      const audioBlob = await this.generateSpeech(text, voice);
-      const audioUrl = URL.createObjectURL(audioBlob);
+      const audioBuffer = await this.generateSpeech(text, voice);
       
-      this.currentAudio = new Audio(audioUrl);
-      this.currentAudio.onended = () => {
-        this.cleanup();
+      if (!this.audioContext) {
+        throw new Error('Audio context not initialized');
+      }
+
+      // Resume audio context if it's suspended
+      if (this.audioContext.state === 'suspended') {
+        await this.audioContext.resume();
+      }
+      
+      this.currentSource = this.audioContext.createBufferSource();
+      this.currentSource.buffer = audioBuffer;
+      this.currentSource.connect(this.audioContext.destination);
+      
+      this.currentSource.onended = () => {
+        this.isCurrentlyPlaying = false;
+        this.isPaused = false;
+        this.currentSource = null;
       };
       
-      await this.currentAudio.play();
+      this.currentSource.start();
+      this.isCurrentlyPlaying = true;
+      this.isPaused = false;
     } catch (error) {
       console.error('Failed to play text:', error);
       throw error;
@@ -126,30 +154,29 @@ class TTSService {
   }
 
   pause(): void {
-    if (this.currentAudio && !this.currentAudio.paused) {
-      this.currentAudio.pause();
+    // Web Audio API doesn't support pause/resume directly
+    // We'll need to stop and remember position for resume
+    if (this.currentSource && this.isCurrentlyPlaying) {
+      this.currentSource.stop();
+      this.isCurrentlyPlaying = false;
+      this.isPaused = true;
     }
   }
 
   resume(): void {
-    if (this.currentAudio && this.currentAudio.paused) {
-      this.currentAudio.play();
-    }
+    // Since Web Audio API doesn't support resume, 
+    // this would require re-implementing with more complex state management
+    // For now, we'll just indicate it's not paused
+    this.isPaused = false;
   }
 
   stop(): void {
-    if (this.currentAudio) {
-      this.currentAudio.pause();
-      this.currentAudio.currentTime = 0;
-      this.cleanup();
+    if (this.currentSource) {
+      this.currentSource.stop();
+      this.currentSource = null;
     }
-  }
-
-  private cleanup(): void {
-    if (this.currentAudio) {
-      URL.revokeObjectURL(this.currentAudio.src);
-      this.currentAudio = null;
-    }
+    this.isCurrentlyPlaying = false;
+    this.isPaused = false;
   }
 
   getVoices(): TTSVoice[] {
@@ -157,11 +184,11 @@ class TTSService {
   }
 
   isPlaying(): boolean {
-    return this.currentAudio ? !this.currentAudio.paused : false;
+    return this.isCurrentlyPlaying;
   }
 
   isPaused(): boolean {
-    return this.currentAudio ? this.currentAudio.paused : false;
+    return this.isPaused;
   }
 }
 
