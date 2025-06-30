@@ -240,7 +240,7 @@ export class CytoscapeGraphModel {
     const pageRank = this.cy.elements().pageRank({ dampingFactor: 0.85 });
     const betweenness = this.cy.elements().betweennessCentrality({ directed: false });
     
-    // Fix: Closeness centrality requires computation for each node individually
+    // Fix: Closeness centrality returns the value directly for each node
     const centralNodes: AdvancedCentralityMetrics[] = this.cy.nodes().map(node => {
       // Compute closeness centrality for this specific node as root
       const closenessResult = this.cy!.elements().closenessCentrality({ root: node, directed: false });
@@ -250,7 +250,7 @@ export class CytoscapeGraphModel {
         degree: node.degree(false),
         pageRank: pageRank.rank(node),
         betweenness: betweenness.betweenness(node),
-        closeness: closenessResult.closeness(node) // Access closeness for this node
+        closeness: closenessResult // closenessResult is the number directly
       };
     })
     .sort((a, b) => b.pageRank - a.pageRank); // Sort by influence (PageRank)
