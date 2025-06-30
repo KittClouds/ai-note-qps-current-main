@@ -64,6 +64,8 @@ import { Triple } from '@/extensions/Triple';
 import { NoteSyntax } from '@/extensions/NoteSyntax';
 import { Connections } from '@/extensions/Connections';
 import { NERHighlight } from '@/extensions/NERHighlight';
+import { AIHighlight } from '@/extensions/AIHighlight';
+import AIControlBar from '@/components/ai/AIControlBar';
 
 // Import CSS
 import 'reactjs-tiptap-editor/style.css';
@@ -116,6 +118,13 @@ const extensions = [
   
   // Add NER highlighting extension
   NERHighlight,
+  
+  // Add AI highlighting extension
+  AIHighlight.configure({
+    HTMLAttributes: {
+      class: 'ai-highlight',
+    },
+  }),
   
   // Add input rules extension
   NoteSyntax,
@@ -390,6 +399,14 @@ const RichEditor = ({
           },
         }}
       />
+      
+      {/* Add AI Control Bar at the bottom */}
+      {editorInstance && (
+        <AIControlBar 
+          editor={editorInstance} 
+          isDarkMode={isDarkMode}
+        />
+      )}
     </div>
   );
 };
