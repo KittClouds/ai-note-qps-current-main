@@ -64,7 +64,6 @@ import { Triple } from '@/extensions/Triple';
 import { NoteSyntax } from '@/extensions/NoteSyntax';
 import { Connections } from '@/extensions/Connections';
 import { NERHighlight } from '@/extensions/NERHighlight';
-import { AIHighlight } from '@/extensions/AIHighlight';
 
 // Import CSS
 import 'reactjs-tiptap-editor/style.css';
@@ -75,8 +74,6 @@ import 'easydrawer/styles.css';
 import 'react-image-crop/dist/ReactCrop.css';
 
 import { useLayoutDimensions } from '@/hooks/useLayoutDimensions';
-import { EditorProvider } from '@/contexts/EditorContext';
-import GenerativeMenuSwitch from '@/components/generative/GenerativeMenuSwitch';
 
 interface RichEditorProps {
   content: string;
@@ -99,7 +96,7 @@ function convertBase64ToBlob(base64: string) {
   return new Blob([u8arr], { type: mime });
 }
 
-// Extensions array with AI highlight
+// Extensions array without indexer, search commands, and fancy highlights
 const extensions = [
   BaseKit.configure({
     placeholder: {
@@ -119,9 +116,6 @@ const extensions = [
   
   // Add NER highlighting extension
   NERHighlight,
-  
-  // Add AI highlighting extension
-  AIHighlight,
   
   // Add input rules extension
   NoteSyntax,
@@ -264,7 +258,6 @@ const RichEditor = ({
   });
   
   const [editorInstance, setEditorInstance] = useState<any>(null);
-  const [aiMenuOpen, setAiMenuOpen] = useState(false);
   const previousContentRef = useRef<string>('');
 
   const dimensions = useLayoutDimensions({ 
@@ -337,74 +330,67 @@ const RichEditor = ({
   const maxHeight = toolbarVisible ? "calc(100vh - 200px)" : "calc(100vh - 140px)";
 
   return (
-    <EditorProvider editor={editorInstance}>
-      <div className="h-full flex flex-col min-h-0 editor-themed theme-aware-editor">
-        <RichTextEditor
-          output="json"
-          content={editorContent as any}
-          onChangeContent={onValueChange}
-          ref={(editorRef: any) => {
-            if (editorRef?.editor && !editorInstance) {
-              onEditorCreate(editorRef.editor);
-            }
-          }}
-          extensions={extensions}
-          dark={isDarkMode}
-          minHeight="400px"
-          maxHeight={dimensions.availableHeight}
-          hideToolbar={!toolbarVisible}
-          bubbleMenu={{
-            render({ extensionsNames, editor, disabled }, bubbleDefaultDom) {
-              return (
-                <>
-                  <GenerativeMenuSwitch 
-                    open={aiMenuOpen} 
-                    onOpenChange={setAiMenuOpen}
-                  >
-                    {bubbleDefaultDom}
-                  </GenerativeMenuSwitch>
-                  {extensionsNames.includes('twitter') ? (
-                    <BubbleMenuTwitter
-                      disabled={disabled}
-                      editor={editor}
-                      key="twitter"
-                    />
-                  ) : null}
-                  {extensionsNames.includes('katex') ? (
-                    <BubbleMenuKatex
-                      disabled={disabled}
-                      editor={editor}
-                      key="katex"
-                    />
-                  ) : null}
-                  {extensionsNames.includes('excalidraw') ? (
-                    <BubbleMenuExcalidraw
-                      disabled={disabled}
-                      editor={editor}
-                      key="excalidraw"
-                    />
-                  ) : null}
-                  {extensionsNames.includes('mermaid') ? (
-                    <BubbleMenuMermaid
-                      disabled={disabled}
-                      editor={editor}
-                      key="mermaid"
-                    />
-                  ) : null}
-                  {extensionsNames.includes('drawer') ? (
-                    <BubbleMenuDrawer
-                      disabled={disabled}
-                      editor={editor}
-                      key="drawer"
-                    />
-                  ) : null}
-                </>
-              );
-            },
-          }}
-        />
-      </div>
-    </EditorProvider>
+    <div className="h-full flex flex-col min-h-0 editor-themed theme-aware-editor">
+      <RichTextEditor
+        output="json"
+        content={editorContent as any}
+        onChangeContent={onValueChange}
+        ref={(editorRef: any) => {
+          if (editorRef?.editor && !editorInstance) {
+            onEditorCreate(editorRef.editor);
+          }
+        }}
+        extensions={extensions}
+        dark={isDarkMode}
+        minHeight="400px"
+        maxHeight={dimensions.availableHeight}
+        hideToolbar={!toolbarVisible}
+        bubbleMenu={{
+          render({ extensionsNames, editor, disabled }, bubbleDefaultDom) {
+            return (
+              <>
+                {bubbleDefaultDom}
+                {extensionsNames.includes('twitter') ? (
+                  <BubbleMenuTwitter
+                    disabled={disabled}
+                    editor={editor}
+                    key="twitter"
+                  />
+                ) : null}
+                {extensionsNames.includes('katex') ? (
+                  <BubbleMenuKatex
+                    disabled={disabled}
+                    editor={editor}
+                    key="katex"
+                  />
+                ) : null}
+                {extensionsNames.includes('excalidraw') ? (
+                  <BubbleMenuExcalidraw
+                    disabled={disabled}
+                    editor={editor}
+                    key="excalidraw"
+                  />
+                ) : null}
+                {extensionsNames.includes('mermaid') ? (
+                  <BubbleMenuMermaid
+                    disabled={disabled}
+                    editor={editor}
+                    key="mermaid"
+                  />
+                ) : null}
+                {extensionsNames.includes('drawer') ? (
+                  <BubbleMenuDrawer
+                    disabled={disabled}
+                    editor={editor}
+                    key="drawer"
+                  />
+                ) : null}
+              </>
+            );
+          },
+        }}
+      />
+    </div>
   );
 };
 
