@@ -33,7 +33,8 @@ export function LayoutSizer({
     <div 
       className={className}
       style={{
-        height: dimensions.availableHeight,
+        // Only set height for non-header elements or when specifically needed
+        ...(forHeader ? {} : { height: dimensions.availableHeight }),
         ...(shouldSetWidth && { width: dimensions.availableWidth }),
         transition: 'width 0.2s ease-linear',
         ...style

@@ -9,7 +9,7 @@ export interface LayoutDimensions {
 export const LAYOUT_CONSTANTS = {
   HEADER_HEIGHT: 64, // Header height in px
   CONNECTIONS_PANEL_HEIGHT: 300, // Default connections panel height
-  TOOLBAR_HEIGHT: 60, // Approximate toolbar height
+  TOOLBAR_HEIGHT: 40, // Reduced toolbar height
   LEFT_SIDEBAR_WIDTH: 256, // 16rem in px
   RIGHT_SIDEBAR_WIDTH: 256, // 16rem in px
 } as const;
@@ -18,12 +18,19 @@ export function calculateAvailableHeight(options: {
   includeConnections?: boolean;
   includeToolbar?: boolean;
   customOffset?: number;
+  forHeader?: boolean;
 } = {}): string {
   const { 
     includeConnections = false, 
     includeToolbar = false, 
-    customOffset = 0 
+    customOffset = 0,
+    forHeader = false
   } = options;
+
+  // For header, we don't need to subtract header height
+  if (forHeader) {
+    return '100vh';
+  }
 
   let totalOffset = LAYOUT_CONSTANTS.HEADER_HEIGHT + customOffset;
   
