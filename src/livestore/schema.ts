@@ -286,6 +286,16 @@ export const tables = {
     }
   }),
 
+  // NEW: HNSW graph snapshots metadata table
+  hnswSnapshots: State.SQLite.table({
+    name: 'hnsw_graph_snapshots',
+    columns: {
+      fileName: State.SQLite.text({ primaryKey: true }),
+      checksum: State.SQLite.text(),
+      createdAt: State.SQLite.text()
+    }
+  }),
+
   // Client-only UI state (doesn't sync)
   uiState: State.SQLite.clientDocument({
     name: 'uiState',
@@ -391,6 +401,23 @@ export const events = {
       noteId: Schema.String,
       contentTypes: Schema.Array(Schema.String),
       updatedAt: Schema.String
+    })
+  }),
+
+  // NEW: HNSW snapshot events
+  hnswGraphSnapshotCreated: Events.synced({
+    name: 'v1.HnswGraphSnapshotCreated',
+    schema: Schema.Struct({
+      fileName: Schema.String,
+      checksum: Schema.String,
+      createdAt: Schema.String
+    })
+  }),
+
+  hnswSnapshotDeleted: Events.synced({
+    name: 'v1.HnswSnapshotDeleted',
+    schema: Schema.Struct({
+      fileName: Schema.String
     })
   }),
 
@@ -570,6 +597,21 @@ const materializers = State.SQLite.materializers(events, {
     });
     
     return operations;
+  },
+
+  // NEW: HNSW snapshot materializers
+  'v1.HnswGraphSnapshotCreated': ({ fileName, checksum, createdAt }) => {
+    console.log('LiveStore Materializer Debug - HNSW Snapshot Created:', { fileName, checksum, createdAt });
+    const result = tables.hnswSnapshots.insert({ fileName, checksum, createdAt });
+    console.log('LiveStore Materializer Debug - HNSW snapshot insert result:', result);
+    return result;
+  },
+
+  'v1.HnswSnapshotDeleted': ({ fileName }) => {
+    console.log('LiveStore Materializer Debug - HNSW Snapshot Deleted:', { fileName });
+    const result = tables.hnswSnapshots.delete().where({ fileName });
+    console.log('LiveStore Materializer Debug - HNSW snapshot delete result:', result);
+    return result;
   }
 });
 

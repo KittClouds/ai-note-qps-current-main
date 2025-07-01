@@ -1,5 +1,7 @@
+
 import { HNSW } from './HNSW';
 import { SimilarityIndex } from './graphrag';
+import { hnswPersistence } from './HNSW/persistence';
 
 /**
  * Adapter to make the existing HNSW implementation compatible with GraphRAG's SimilarityIndex interface
@@ -109,5 +111,57 @@ export class HNSWAdapter implements SimilarityIndex {
       nodeCount: this.hnsw.nodes.size,
       dimension: this.hnsw.d
     };
+  }
+
+  /**
+   * Save the current HNSW graph to persistent storage
+   */
+  async saveGraph(): Promise<void> {
+    try {
+      await hnswPersistence.persistGraph(this.hnsw);
+      console.log(`[HNSWAdapter] Graph saved with ${this.hnsw.nodes.size} nodes`);
+    } catch (error) {
+      console.error('[HNSWAdapter] Failed to save graph:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Load the latest HNSW graph from persistent storage
+   */
+  async loadGraph(): Promise<boolean> {
+    try {
+      const loadedGraph = await hnswPersistence.loadLatestGraph();
+      if (loadedGraph) {
+        this.hnsw = loadedGraph;
+        console.log(`[HNSWAdapter] Graph loaded with ${this.hnsw.nodes.size} nodes`);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('[HNSWAdapter] Failed to load graph:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Set the store reference for persistence operations
+   */
+  setStore(store: any): void {
+    hnswPersistence.setStore(store);
+  }
+
+  /**
+   * Get snapshot information
+   */
+  async getSnapshotInfo(): Promise<{ count: number; latestDate?: Date; totalSize?: number }> {
+    return await hnswPersistence.getSnapshotInfo();
+  }
+
+  /**
+   * Clean up old snapshots
+   */
+  async cleanupOldSnapshots(keepLast = 2): Promise<number> {
+    return await hnswPersistence.gcOldSnapshots(keepLast);
   }
 }

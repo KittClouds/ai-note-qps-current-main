@@ -1,7 +1,10 @@
+
 export { HNSW } from './HNSW';
 export { Node } from './HNSW/node';
 export { PriorityQueue } from './HNSW/pqueue';
 export { cosineSimilarity, euclideanSimilarity } from './HNSW/similarity';
+export { encodeGraph, decodeGraph } from './HNSW/serialize';
+export { HnswPersistence, hnswPersistence } from './HNSW/persistence';
 
 // New exports for GraphRAG and embeddings
 export { GraphRAG, type GraphNode, type RankedNode, type GraphEdge, type SimilarityIndex } from './graphrag';
