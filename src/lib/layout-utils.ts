@@ -69,8 +69,8 @@ export function calculateAvailableWidth(options: {
     totalSidebarWidth += LAYOUT_CONSTANTS.LEFT_SIDEBAR_WIDTH;
   }
 
-  // For header calculations, we need to account for both sidebars
-  if (forHeader && rightSidebarOpen) {
+  // For both header and content, account for right sidebar when it's open
+  if (rightSidebarOpen) {
     totalSidebarWidth += LAYOUT_CONSTANTS.RIGHT_SIDEBAR_WIDTH;
   }
 

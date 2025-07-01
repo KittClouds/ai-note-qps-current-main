@@ -24,10 +24,6 @@ export function LayoutSizer({
 }: LayoutSizerProps) {
   const dimensions = useLayoutDimensions({ includeConnections, includeToolbar, forHeader });
   const isMobile = useIsMobile();
-  const { open: rightSidebarOpen } = useRightSidebar();
-
-  // On desktop, don't set width when right sidebar is open and we're not calculating for header
-  const shouldSetWidth = isMobile || !rightSidebarOpen || forHeader;
 
   return (
     <div 
@@ -35,7 +31,8 @@ export function LayoutSizer({
       style={{
         // Only set height for non-header elements or when specifically needed
         ...(forHeader ? {} : { height: dimensions.availableHeight }),
-        ...(shouldSetWidth && { width: dimensions.availableWidth }),
+        // Always set width to ensure proper layout with sidebars
+        width: dimensions.availableWidth,
         transition: 'width 0.2s ease-linear',
         ...style
       }}
