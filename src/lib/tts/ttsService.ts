@@ -119,11 +119,6 @@ export class TTSService {
         resolve();
       };
 
-      this.currentSource.onerror = () => {
-        this.isPlaying = false;
-        reject(new Error('Audio playback failed'));
-      };
-
       try {
         this.currentSource.start();
       } catch (error) {
