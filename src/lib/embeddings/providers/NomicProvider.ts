@@ -2,7 +2,7 @@
 import { BaseEmbeddingProvider, EmbeddingOptions } from './EmbeddingProvider';
 
 export class NomicProvider extends BaseEmbeddingProvider {
-  readonly name = 'GTE Base EN v1.5';
+  readonly name = 'Nomic Embed Text v1.5';
   readonly dimension = 768;
   readonly maxBatchSize = 10;
 
@@ -14,9 +14,9 @@ export class NomicProvider extends BaseEmbeddingProvider {
     if (this.isInitialized) return;
 
     try {
-      console.log('[GTE Provider] Initializing with GTE Base EN v1.5 model');
+      console.log('[Nomic Provider] Initializing with Nomic Embed Text v1.5 model');
       
-      // Create dedicated worker for GTE model
+      // Create dedicated worker for Nomic model
       this.worker = new Worker(new URL('../nomicWorker.ts', import.meta.url), {
         type: 'module'
       });
@@ -26,7 +26,7 @@ export class NomicProvider extends BaseEmbeddingProvider {
         const { type, id, embeddings, error } = event.data;
         
         if (type === 'progress') {
-          console.log('[GTE Provider] Loading progress:', event.data.data);
+          console.log('[Nomic Provider] Loading progress:', event.data.data);
           return;
         }
 
@@ -43,7 +43,7 @@ export class NomicProvider extends BaseEmbeddingProvider {
       };
 
       this.worker.onerror = (error) => {
-        console.error('[GTE Provider] Worker error:', error);
+        console.error('[Nomic Provider] Worker error:', error);
         // Reject all pending requests
         for (const request of this.pendingRequests.values()) {
           request.reject(new Error('Worker encountered an error'));
@@ -55,9 +55,9 @@ export class NomicProvider extends BaseEmbeddingProvider {
       await this.initializeWorker();
       
       this.isInitialized = true;
-      console.log('[GTE Provider] Initialization complete');
+      console.log('[Nomic Provider] Initialization complete');
     } catch (error) {
-      console.error('[GTE Provider] Failed to initialize:', error);
+      console.error('[Nomic Provider] Failed to initialize:', error);
       throw error;
     }
   }
@@ -92,14 +92,14 @@ export class NomicProvider extends BaseEmbeddingProvider {
 
   async generateEmbeddings(texts: string[], options: EmbeddingOptions = {}): Promise<number[][]> {
     if (!this.isInitialized || !this.worker) {
-      throw new Error('GTE Provider not initialized');
+      throw new Error('Nomic Provider not initialized');
     }
 
     if (texts.length === 0) {
       return [];
     }
 
-    console.log(`[GTE Provider] Generating embeddings for ${texts.length} texts`);
+    console.log(`[Nomic Provider] Generating embeddings for ${texts.length} texts`);
 
     return new Promise((resolve, reject) => {
       const id = ++this.requestId;
@@ -124,7 +124,7 @@ export class NomicProvider extends BaseEmbeddingProvider {
   }
 
   dispose(): void {
-    console.log('[GTE Provider] Disposing resources');
+    console.log('[Nomic Provider] Disposing resources');
     
     // Reject all pending requests
     for (const request of this.pendingRequests.values()) {

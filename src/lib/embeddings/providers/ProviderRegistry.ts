@@ -12,7 +12,7 @@ export class ProviderRegistry {
     // Register available providers
     this.registerProvider('huggingface', new HuggingFaceProvider());
     this.registerProvider('gemini', new GeminiProvider());
-    this.registerProvider('gte', new NomicProvider()); // Using NomicProvider class but with GTE model
+    this.registerProvider('nomic', new NomicProvider()); // Now properly using Nomic model
     
     // Set default provider
     this.activeProvider = 'huggingface';
