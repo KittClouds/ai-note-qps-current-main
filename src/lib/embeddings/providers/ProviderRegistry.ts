@@ -2,6 +2,7 @@
 import { EmbeddingProvider } from './EmbeddingProvider';
 import { HuggingFaceProvider } from './HuggingFaceProvider';
 import { GeminiProvider } from './GeminiProvider';
+import { NomicProvider } from './NomicProvider';
 
 export class ProviderRegistry {
   private providers = new Map<string, EmbeddingProvider>();
@@ -11,6 +12,7 @@ export class ProviderRegistry {
     // Register available providers
     this.registerProvider('huggingface', new HuggingFaceProvider());
     this.registerProvider('gemini', new GeminiProvider());
+    this.registerProvider('nomic', new NomicProvider());
     
     // Set default provider
     this.activeProvider = 'huggingface';
