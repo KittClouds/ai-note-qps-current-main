@@ -1,4 +1,3 @@
-
 import { pipeline, PipelineType } from "@huggingface/transformers";
 
 class GTEFeatureExtractionPipeline {
@@ -9,7 +8,6 @@ class GTEFeatureExtractionPipeline {
   static async getInstance(progress_callback = null) {
     if (this.instance === null) {
       this.instance = pipeline(this.task, this.model, {
-        quantized: false,
         progress_callback,
       });
     }
