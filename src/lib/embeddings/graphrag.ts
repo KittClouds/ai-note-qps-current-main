@@ -1,3 +1,4 @@
+
 // --- Core Graph Types ---
 
 export interface EdgeTypeDefinition {
@@ -47,7 +48,11 @@ export class GraphRAG {
   private dimension: number;
   private edgeTypeDefinitions: Map<string, EdgeTypeDefinition>;
 
-  constructor(dimension: number = 384) {
+  constructor(dimension: number) {
+    if (!dimension || dimension <= 0) {
+      throw new Error('GraphRAG dimension must be a positive number');
+    }
+    
     this.nodes = new Map();
     this.edges = [];
     this.dimension = dimension;
@@ -61,6 +66,10 @@ export class GraphRAG {
 
   // Add method to update dimensions
   updateDimension(newDimension: number): void {
+    if (!newDimension || newDimension <= 0) {
+      throw new Error('GraphRAG dimension must be a positive number');
+    }
+    
     if (this.nodes.size > 0) {
       console.warn(`[GraphRAG] Updating dimension on non-empty graph from ${this.dimension}D to ${newDimension}D. Existing embeddings may be incompatible.`);
     }

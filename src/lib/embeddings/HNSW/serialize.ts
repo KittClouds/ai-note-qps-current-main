@@ -5,12 +5,23 @@ import { Node } from './node';
 const MAGIC = 0x48534e57; // "HNSW" in ASCII
 
 export function encodeGraph(graph: HNSW): Uint8Array {
+  // Get actual dimension from graph or estimate from first node
+  let actualDimension = graph.d;
+  if (!actualDimension && graph.nodes.size > 0) {
+    const firstNode = graph.nodes.values().next().value;
+    actualDimension = firstNode?.vector?.length || 0;
+  }
+  
+  if (!actualDimension) {
+    throw new Error('Cannot determine graph dimension for serialization');
+  }
+
   // Calculate total size needed
   let totalSize = 14; // header: magic(4) + dim(2) + M(2) + totalNodes(4) + levelMax(2)
   
   for (const [nodeId, node] of graph.nodes) {
     totalSize += 5; // nodeId(4) + levelCount(1)
-    totalSize += (graph.d || 384) * 4; // vector data (float32 = 4 bytes each)
+    totalSize += actualDimension * 4; // vector data (float32 = 4 bytes each)
     for (let level = 0; level <= node.level; level++) {
       totalSize += 2; // neighbourCount(2)
       const neighbors = node.neighbors[level].filter(id => id !== -1);
@@ -26,7 +37,7 @@ export function encodeGraph(graph: HNSW): Uint8Array {
   view.setUint32(offset, MAGIC, false); // big-endian for cross-platform consistency
   offset += 4;
   
-  view.setUint16(offset, graph.d || 0, false);
+  view.setUint16(offset, actualDimension, false);
   offset += 2;
   
   view.setUint16(offset, graph.M, false);
@@ -91,9 +102,14 @@ export function decodeGraph(bytes: Uint8Array): HNSW {
   const levelMax = view.getUint16(offset, false);
   offset += 2;
 
+  // Validate dimension
+  if (!d || d <= 0) {
+    throw new Error(`Invalid dimension in serialized graph: ${d}`);
+  }
+
   // Create HNSW instance
   const graph = new HNSW(M, 200, 'cosine');
-  graph.d = d || null;
+  graph.d = d;
   graph.levelMax = levelMax;
 
   // Read nodes
@@ -107,9 +123,8 @@ export function decodeGraph(bytes: Uint8Array): HNSW {
     const nodeLevel = levelCount - 1;
     
     // Read vector data
-    const vectorDim = d || 384;
-    const vector = new Float32Array(vectorDim);
-    for (let j = 0; j < vectorDim; j++) {
+    const vector = new Float32Array(d);
+    for (let j = 0; j < d; j++) {
       vector[j] = view.getFloat32(offset, false);
       offset += 4;
     }

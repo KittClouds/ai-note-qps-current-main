@@ -13,13 +13,21 @@ export class HNSWAdapter implements SimilarityIndex {
   private nextNodeId = 0;
   private dimension: number;
 
-  constructor(dimension: number = 384, M: number = 16, efConstruction: number = 200) {
+  constructor(dimension: number, M: number = 16, efConstruction: number = 200) {
+    if (!dimension || dimension <= 0) {
+      throw new Error('HNSWAdapter dimension must be a positive number');
+    }
+    
     this.dimension = dimension;
     this.hnsw = new HNSW(M, efConstruction, 'cosine');
     console.log(`[HNSWAdapter] Initialized with ${dimension}D`);
   }
 
   updateDimension(newDimension: number): void {
+    if (!newDimension || newDimension <= 0) {
+      throw new Error('HNSWAdapter dimension must be a positive number');
+    }
+    
     if (this.hnsw.nodes.size > 0) {
       console.warn(`[HNSWAdapter] Updating dimension on non-empty HNSW index from ${this.dimension}D to ${newDimension}D. Clearing existing data.`);
       this.clear();

@@ -1,4 +1,3 @@
-
 import { GraphRAG, GraphNode, RankedNode } from './graphrag';
 import { HNSWAdapter } from './hnswAdapter';
 import { createNoteChunks, TextChunk, preprocessText } from './textProcessing';
@@ -36,17 +35,15 @@ export interface IndexStatus {
 }
 
 export class EmbeddingsService {
-  private graphRAG: GraphRAG;
-  private hnswAdapter: HNSWAdapter;
+  private graphRAG: GraphRAG | null = null;
+  private hnswAdapter: HNSWAdapter | null = null;
   private isInitialized = false;
   private noteMetadata = new Map<string, { title: string; noteId: string }>();
   private currentProvider: EmbeddingProvider | null = null;
-  private currentDimension: number = 384; // Track current dimension
+  private currentDimension: number | null = null;
 
   constructor() {
-    // Initialize with default dimensions - will be updated when provider is set
-    this.graphRAG = new GraphRAG(this.currentDimension);
-    this.hnswAdapter = new HNSWAdapter(this.currentDimension);
+    // Don't initialize components here - wait for provider initialization
   }
 
   async initialize(): Promise<void> {
@@ -55,7 +52,7 @@ export class EmbeddingsService {
     try {
       console.log('[EmbeddingsService] Initializing...');
       
-      // Initialize provider registry
+      // Initialize provider registry first
       await providerRegistry.initializeFromStorage();
       this.currentProvider = providerRegistry.getActiveProvider();
       
@@ -65,8 +62,8 @@ export class EmbeddingsService {
 
       console.log(`[EmbeddingsService] Active provider: ${this.currentProvider.name} (${this.currentProvider.dimension}D)`);
 
-      // Update dimensions based on active provider BEFORE any operations
-      await this.updateDimensions(this.currentProvider.dimension);
+      // Initialize components with provider's dimensions
+      await this.initializeComponents(this.currentProvider.dimension);
       
       this.isInitialized = true;
       console.log('[EmbeddingsService] Initialization complete');
@@ -74,6 +71,23 @@ export class EmbeddingsService {
       console.error('Failed to initialize embeddings service:', error);
       throw error;
     }
+  }
+
+  private async initializeComponents(dimension: number): Promise<void> {
+    if (!dimension || dimension <= 0) {
+      throw new Error('Invalid dimension for component initialization');
+    }
+
+    console.log(`[EmbeddingsService] Initializing components with ${dimension}D`);
+    
+    // Update dimension tracking
+    this.currentDimension = dimension;
+    
+    // Initialize or recreate components with correct dimensions
+    this.graphRAG = new GraphRAG(dimension);
+    this.hnswAdapter = new HNSWAdapter(dimension);
+    
+    console.log(`[EmbeddingsService] Components initialized with ${dimension}D`);
   }
 
   async switchProvider(providerId: string, apiKey?: string): Promise<void> {
@@ -93,33 +107,14 @@ export class EmbeddingsService {
       
       if (this.currentProvider) {
         console.log(`[EmbeddingsService] Provider switched to ${this.currentProvider.name} (${this.currentProvider.dimension}D)`);
-        await this.updateDimensions(this.currentProvider.dimension);
+        
+        // Reinitialize components with new provider's dimensions
+        await this.initializeComponents(this.currentProvider.dimension);
       }
     } catch (error) {
       console.error('Failed to switch provider:', error);
       throw error;
     }
-  }
-
-  private async updateDimensions(newDimension: number): Promise<void> {
-    if (this.currentDimension === newDimension) {
-      console.log(`[EmbeddingsService] Dimension already set to ${newDimension}, skipping update`);
-      return;
-    }
-
-    console.log(`[EmbeddingsService] Updating dimensions from ${this.currentDimension} to ${newDimension}`);
-    
-    // Clear existing data when switching dimensions
-    this.clear();
-    
-    // Update dimension tracking
-    this.currentDimension = newDimension;
-    
-    // Recreate components with new dimensions
-    this.graphRAG = new GraphRAG(newDimension);
-    this.hnswAdapter = new HNSWAdapter(newDimension);
-    
-    console.log(`[EmbeddingsService] Components recreated with ${newDimension}D`);
   }
 
   getCurrentProvider(): EmbeddingProvider | null {
@@ -131,10 +126,8 @@ export class EmbeddingsService {
       throw new Error('No embedding provider initialized');
     }
 
-    // Validate provider dimensions match our current setup
-    if (this.currentProvider.dimension !== this.currentDimension) {
-      console.warn(`[EmbeddingsService] Dimension mismatch detected! Provider: ${this.currentProvider.dimension}D, Service: ${this.currentDimension}D`);
-      await this.updateDimensions(this.currentProvider.dimension);
+    if (!this.currentDimension) {
+      throw new Error('Dimension not set - service not properly initialized');
     }
 
     const texts = Array.isArray(text) ? text : [text];
@@ -163,6 +156,10 @@ export class EmbeddingsService {
   ): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();
+    }
+
+    if (!this.graphRAG || !this.hnswAdapter) {
+      throw new Error('Components not initialized');
     }
 
     try {
@@ -223,7 +220,7 @@ export class EmbeddingsService {
           }
         };
         
-        this.graphRAG.addNode(node);
+        this.graphRAG!.addNode(node);
         this.noteMetadata.set(nodeId, { title, noteId });
       });
 
@@ -250,7 +247,7 @@ export class EmbeddingsService {
    * Remove a note from the knowledge graph
    */
   removeNote(noteId: string): void {
-    const nodes = this.graphRAG.getNodes();
+    const nodes = this.graphRAG!.getNodes();
     const nodesToRemove = nodes.filter(node =>
       node.metadata?.originalNoteId === noteId
     );
@@ -264,21 +261,21 @@ export class EmbeddingsService {
       );
 
       // Rebuild the graph
-      this.graphRAG.clear();
-      this.hnswAdapter.clear();
+      this.graphRAG!.clear();
+      this.hnswAdapter!.clear();
 
       // Re-add remaining nodes
       remainingNodes.forEach(node => {
-        this.graphRAG.addNode(node);
+        this.graphRAG!.addNode(node);
       });
 
       // Rebuild edges
-      this.graphRAG.buildSemanticEdges({ 
+      this.graphRAG!.buildSemanticEdges({ 
         threshold: 0.7, 
-        index: this.hnswAdapter,
+        index: this.hnswAdapter!,
         k: 10 
       });
-      this.graphRAG.buildSequentialEdges({ metadataKey: 'chunkIndex' });
+      this.graphRAG!.buildSequentialEdges({ metadataKey: 'chunkIndex' });
 
       console.log(`Removed note ${noteId} from knowledge graph`);
     }
@@ -290,6 +287,10 @@ export class EmbeddingsService {
   async search(query: string, topK: number = 10): Promise<SearchResult[]> {
     if (!this.isInitialized) {
       await this.initialize();
+    }
+
+    if (!this.graphRAG) {
+      throw new Error('GraphRAG not initialized');
     }
 
     try {
@@ -357,8 +358,8 @@ export class EmbeddingsService {
   }
 
   getIndexStatus(): IndexStatus {
-    const nodes = this.graphRAG.getNodes();
-    const edges = this.graphRAG.getEdges();
+    const nodes = this.graphRAG!.getNodes();
+    const edges = this.graphRAG!.getEdges();
     
     return {
       hasIndex: nodes.length > 0,
@@ -370,8 +371,8 @@ export class EmbeddingsService {
   }
 
   clear(): void {
-    this.graphRAG.clear();
-    this.hnswAdapter.clear();
+    this.graphRAG!.clear();
+    this.hnswAdapter!.clear();
   }
 
   dispose(): void {
