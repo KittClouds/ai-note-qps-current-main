@@ -1,3 +1,4 @@
+
 import { GraphRAG, GraphNode, RankedNode } from './graphrag';
 import { HNSWAdapter } from './hnswAdapter';
 import { createNoteChunks, TextChunk, preprocessText } from './textProcessing';
@@ -358,8 +359,19 @@ export class EmbeddingsService {
   }
 
   getIndexStatus(): IndexStatus {
-    const nodes = this.graphRAG!.getNodes();
-    const edges = this.graphRAG!.getEdges();
+    // Handle case when components aren't initialized yet
+    if (!this.graphRAG || !this.hnswAdapter) {
+      return {
+        hasIndex: false,
+        indexSize: 0,
+        needsRebuild: false,
+        graphNodes: 0,
+        graphEdges: 0
+      };
+    }
+
+    const nodes = this.graphRAG.getNodes();
+    const edges = this.graphRAG.getEdges();
     
     return {
       hasIndex: nodes.length > 0,
@@ -371,8 +383,12 @@ export class EmbeddingsService {
   }
 
   clear(): void {
-    this.graphRAG!.clear();
-    this.hnswAdapter!.clear();
+    if (this.graphRAG) {
+      this.graphRAG.clear();
+    }
+    if (this.hnswAdapter) {
+      this.hnswAdapter.clear();
+    }
   }
 
   dispose(): void {
