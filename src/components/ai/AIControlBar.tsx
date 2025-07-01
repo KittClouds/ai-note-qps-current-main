@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Command, CommandInput, CommandList } from '@/components/ui/command';
@@ -6,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { RefreshCcwDot, CheckCheck, ArrowDownWideNarrow, WrapText, StepForward, Sparkles, X } from 'lucide-react';
 import { useAICompletion } from '@/hooks/useAICompletion';
+import { TTSButton } from '@/components/TTSButton';
 import AISelectorCommands from './AISelectorCommands';
 import AICompletionCommands from './AICompletionCommands';
 
@@ -30,6 +30,21 @@ const AIControlBar = ({ editor, isDarkMode }: AIControlBarProps) => {
     onComplete: () => setMode('completion'),
     onError: (error) => console.error('AI Error:', error),
   });
+
+  // Extract text from editor for TTS
+  const getTextForTTS = (): string => {
+    if (!editor) return '';
+    
+    const { from, to } = editor.state.selection;
+    
+    // If text is selected, use that
+    if (from !== to) {
+      return editor.state.doc.textBetween(from, to, ' ');
+    }
+    
+    // Otherwise, use the entire document text
+    return editor.state.doc.textContent || '';
+  };
 
   const handleAISelect = async (text: string, option: string) => {
     setMode('completion');
@@ -93,6 +108,14 @@ const AIControlBar = ({ editor, isDarkMode }: AIControlBarProps) => {
             {option.label}
           </Button>
         ))}
+
+        <Separator orientation="vertical" className="h-6" />
+        
+        {/* TTS Button */}
+        <TTSButton 
+          text={getTextForTTS()} 
+          className="h-9"
+        />
       </div>
 
       {/* AI Command Interface */}
