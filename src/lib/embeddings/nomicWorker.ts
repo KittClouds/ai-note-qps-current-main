@@ -1,14 +1,15 @@
 
 import { pipeline, PipelineType } from "@huggingface/transformers";
 
-class NomicFeatureExtractionPipeline {
+class GTEFeatureExtractionPipeline {
   static task: PipelineType = "feature-extraction";
-  static model = "nomic-ai/nomic-embed-text-v1.5";
+  static model = "Alibaba-NLP/gte-base-en-v1.5";
   static instance = null;
 
   static async getInstance(progress_callback = null) {
     if (this.instance === null) {
       this.instance = pipeline(this.task, this.model, {
+        quantized: false,
         progress_callback,
       });
     }
@@ -28,17 +29,17 @@ self.addEventListener("message", async (event) => {
 
   if (type === 'initialize') {
     try {
-      console.log('[NomicWorker] Initializing Nomic model...');
+      console.log('[GTEWorker] Initializing GTE Base EN v1.5 model...');
       
-      const extractor = await NomicFeatureExtractionPipeline.getInstance((x) => {
+      const extractor = await GTEFeatureExtractionPipeline.getInstance((x) => {
         self.postMessage({ type: 'progress', data: x });
       });
 
       isInitialized = true;
       self.postMessage({ type: 'ready' });
-      console.log('[NomicWorker] Nomic model ready');
+      console.log('[GTEWorker] GTE model ready');
     } catch (error) {
-      console.error('[NomicWorker] Failed to initialize:', error);
+      console.error('[GTEWorker] Failed to initialize:', error);
       self.postMessage({ type: 'error', error: error.message });
     }
     return;
@@ -57,9 +58,9 @@ self.addEventListener("message", async (event) => {
     // Handle batch requests
     if (Array.isArray(texts)) {
       try {
-        const extractor = await NomicFeatureExtractionPipeline.getInstance();
+        const extractor = await GTEFeatureExtractionPipeline.getInstance();
 
-        console.log(`[NomicWorker] Processing ${texts.length} texts`);
+        console.log(`[GTEWorker] Processing ${texts.length} texts`);
 
         const embeddings = await extractor(texts, {
           pooling: "mean",
@@ -73,7 +74,7 @@ self.addEventListener("message", async (event) => {
           embeddings: embeddings.tolist()
         });
       } catch (error) {
-        console.error('[NomicWorker] Generation failed:', error);
+        console.error('[GTEWorker] Generation failed:', error);
         self.postMessage({
           type: 'error',
           id,
@@ -101,7 +102,7 @@ async function processQueue() {
   isProcessing = true;
   
   try {
-    const extractor = await NomicFeatureExtractionPipeline.getInstance();
+    const extractor = await GTEFeatureExtractionPipeline.getInstance();
     
     // Process requests in batches for efficiency
     const batchSize = 5;
@@ -131,7 +132,7 @@ async function processQueue() {
       });
     }
   } catch (error) {
-    console.error('[NomicWorker] Queue processing failed:', error);
+    console.error('[GTEWorker] Queue processing failed:', error);
     // Send error to all pending requests
     for (const [id] of requestQueue) {
       self.postMessage({
