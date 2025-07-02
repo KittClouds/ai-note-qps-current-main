@@ -39,7 +39,6 @@ import { Mention } from 'reactjs-tiptap-editor/mention';
 import { MoreMark } from 'reactjs-tiptap-editor/moremark';
 import { OrderedList } from 'reactjs-tiptap-editor/orderedlist';
 import { SearchAndReplace } from 'reactjs-tiptap-editor/searchandreplace';
-import { SearchCommand } from '@/extensions/SearchCommand';
 import { SlashCommand } from 'reactjs-tiptap-editor/slashcommand';
 import { Strike } from 'reactjs-tiptap-editor/strike';
 import { Table } from 'reactjs-tiptap-editor/table';
