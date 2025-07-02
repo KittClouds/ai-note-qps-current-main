@@ -99,7 +99,7 @@ function convertBase64ToBlob(base64: string) {
   return new Blob([u8arr], { type: mime });
 }
 
-// Extensions array without indexer, search commands, and fancy highlights
+// Extensions array with only SearchCommand and QPSCommand (no BM25SearchCommand to avoid conflicts)
 const extensions = [
   BaseKit.configure({
     placeholder: {
@@ -133,9 +133,9 @@ const extensions = [
   // Add connections extension for real-time parsing
   Connections,
   
-  // Add search command extensions - each with unique triggers
-  SearchCommand,
-  QPSCommand, // New QPS extension with unique trigger (@@@) and shortcut (Mod-Shift-K)
+  // Add search command extensions - only SearchCommand (??) and QPSCommand (@@@)
+  SearchCommand,  // trigger: ??, shortcut: Mod-k
+  QPSCommand,     // trigger: @@@, shortcut: Mod-Shift-k
   
   History,
   SearchAndReplace,
