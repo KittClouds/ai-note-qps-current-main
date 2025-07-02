@@ -54,6 +54,7 @@ import { Drawer } from 'reactjs-tiptap-editor/drawer';
 import { Excalidraw } from 'reactjs-tiptap-editor/excalidraw';
 import { Twitter } from 'reactjs-tiptap-editor/twitter';
 import { Mermaid } from 'reactjs-tiptap-editor/mermaid';
+import { QPSCommand } from '@/extensions/QPSCommand';
 
 // Import custom extensions
 import { WikiLink } from '@/extensions/WikiLink';
@@ -132,8 +133,9 @@ const extensions = [
   // Add connections extension for real-time parsing
   Connections,
   
-  // Add search command extension
+  // Add search command extensions - each with unique triggers
   SearchCommand,
+  QPSCommand, // New QPS extension with unique trigger (@@@) and shortcut (Mod-Shift-K)
   
   History,
   SearchAndReplace,

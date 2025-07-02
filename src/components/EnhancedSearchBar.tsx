@@ -12,6 +12,7 @@ import { hybridSearchService, HybridSearchResult } from '@/lib/search/hybridSear
 import { Note } from '@/types/notes';
 import { useToast } from '@/hooks/use-toast';
 import { EmbeddingProviderButton } from './EmbeddingProviderButton';
+import { qpsService, QPSSearchResult } from '@/lib/embeddings/quantum/qpsService';
 
 interface EnhancedSearchBarProps {
   searchQuery: string;
@@ -22,7 +23,7 @@ interface EnhancedSearchBarProps {
 }
 
 type SearchMode = 'text' | 'semantic';
-type SemanticMode = 'semantic' | 'bm25' | 'hybrid';
+type SemanticMode = 'semantic' | 'bm25' | 'hybrid' | 'qps';
 
 export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   searchQuery,
@@ -36,6 +37,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
   const [semanticResults, setSemanticResults] = useState<SearchResult[]>([]);
   const [bm25Results, setBm25Results] = useState<BM25SearchResult[]>([]);
   const [hybridResults, setHybridResults] = useState<HybridSearchResult[]>([]);
+  const [qpsResults, setQpsResults] = useState<QPSSearchResult[]>([]);
   const [alpha, setAlpha] = useState([0.5]);
   const [isSearching, setIsSearching] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -128,6 +130,27 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
     }
   }, 500);
 
+  const handleQPSSearch = useDebouncedCallback(async (query: string) => {
+    if (!query.trim() || searchMode !== 'semantic' || semanticMode !== 'qps') {
+      setQpsResults([]);
+      return;
+    }
+    setIsSearching(true);
+    try {
+      const results = await qpsService.search(query, 10);
+      setQpsResults(results);
+    } catch (error) {
+      console.error('QPS search failed:', error);
+      toast({
+        title: "Search failed",
+        description: "Could not perform QPS search. Try syncing the index first.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  }, 300);
+
   const handleSearchChange = (value: string) => {
     onSearchChange(value);
     if (searchMode === 'semantic') {
@@ -137,6 +160,8 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
         handleBM25Search(value);
       } else if (semanticMode === 'hybrid') {
         handleHybridSearch(value);
+      } else if (semanticMode === 'qps') {
+        handleQPSSearch(value);
       }
     }
   };
@@ -146,6 +171,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
     setSemanticResults([]);
     setBm25Results([]);
     setHybridResults([]);
+    setQpsResults([]);
     
     if (mode === 'semantic' && searchQuery.trim()) {
       if (semanticMode === 'semantic') {
@@ -154,6 +180,8 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
         handleBM25Search(searchQuery);
       } else if (semanticMode === 'hybrid') {
         handleHybridSearch(searchQuery);
+      } else if (semanticMode === 'qps') {
+        handleQPSSearch(searchQuery);
       }
     }
   };
@@ -163,6 +191,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
     setSemanticResults([]);
     setBm25Results([]);
     setHybridResults([]);
+    setQpsResults([]);
     
     if (searchMode === 'semantic' && searchQuery.trim()) {
       if (mode === 'semantic') {
@@ -171,6 +200,8 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
         handleBM25Search(searchQuery);
       } else if (mode === 'hybrid') {
         handleHybridSearch(searchQuery);
+      } else if (mode === 'qps') {
+        handleQPSSearch(searchQuery);
       }
     }
   };
@@ -243,6 +274,26 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
     }
   };
 
+  const handleSyncQPS = async () => {
+    setIsSyncing(true);
+    try {
+      const count = qpsService.syncAllNotes(notes);
+      toast({
+        title: "QPS index synced",
+        description: `Successfully indexed ${count} documents with Quantum Proximity Search`
+      });
+    } catch (error) {
+      console.error('QPS sync failed:', error);
+      toast({
+        title: "Sync failed",
+        description: "Could not sync QPS index. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleAlphaChange = (value: number[]) => {
     setAlpha(value);
     if (searchMode === 'semantic' && semanticMode === 'hybrid' && searchQuery.trim()) {
@@ -257,6 +308,7 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
       if (semanticMode === 'semantic') return "Semantic search...";
       if (semanticMode === 'bm25') return "BM25 search...";
       if (semanticMode === 'hybrid') return "Hybrid search (keyword + semantic)...";
+      if (semanticMode === 'qps') return "Quantum Proximity Search...";
     }
     return "Search notes...";
   };
@@ -324,6 +376,18 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
                 }`}
               >
                 Hybrid
+              </button>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Database className="h-4 w-4 text-primary" />
+              <button
+                onClick={() => handleSemanticModeChange('qps')}
+                className={`text-sm font-medium transition-colors ${
+                  semanticMode === 'qps' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                QPS
               </button>
             </div>
           </div>
@@ -421,6 +485,30 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
               </div>
             </>
           )}
+
+          {semanticMode === 'qps' && (
+            <>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full" 
+                onClick={handleSyncQPS} 
+                disabled={isSyncing}
+              >
+                {isSyncing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Database className="h-4 w-4 mr-2" />
+                )}
+                Sync QPS Index
+              </Button>
+              
+              <div className="flex items-center justify-center text-xs text-muted-foreground">
+                <Database className="h-3 w-3 mr-1" />
+                <span>QPS: {qpsService.getIndexStatus().totalDocuments} docs</span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -494,10 +582,33 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
         </div>
       )}
 
+      {searchMode === 'semantic' && semanticMode === 'qps' && searchQuery && qpsResults.length > 0 && (
+        <div className="space-y-1 mb-3">
+          {qpsResults.map(result => (
+            <div 
+              key={result.noteId} 
+              className="p-2 rounded-md border border-transparent hover:border-primary/20 hover:bg-primary/5 cursor-pointer transition-colors" 
+              onClick={() => onNoteSelect(result.noteId)}
+            >
+              <div className="flex justify-between items-center mb-1">
+                <div className="font-medium text-sm truncate">{result.title}</div>
+                <Badge variant="secondary" className="text-xs">
+                  QPS: {result.score.toFixed(2)}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground line-clamp-2">
+                {result.content.slice(0, 80)}...
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
       {searchMode === 'semantic' && searchQuery && 
        ((semanticMode === 'semantic' && semanticResults.length === 0 && !isSearching) ||
         (semanticMode === 'bm25' && bm25Results.length === 0 && !isSearching) ||
-        (semanticMode === 'hybrid' && hybridResults.length === 0 && !isSearching)) && (
+        (semanticMode === 'hybrid' && hybridResults.length === 0 && !isSearching) ||
+        (semanticMode === 'qps' && qpsResults.length === 0 && !isSearching)) && (
         <div className="text-center text-muted-foreground py-4 mb-3">
           <p className="text-sm">No results found</p>
           <p className="text-xs">Try syncing the index first</p>
