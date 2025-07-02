@@ -16,8 +16,8 @@ export const BM25SearchCommand = Extension.create({
 
   addOptions() {
     return {
-      trigger: '??bm25',
-      paletteKeys: ['Mod-Alt-k'],
+      trigger: '??',
+      paletteKeys: ['Mod-k'],
       fetchHits: async (query: string): Promise<BM25SearchHit[]> => {
         if (!query.trim()) return [];
         

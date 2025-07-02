@@ -39,6 +39,7 @@ import { Mention } from 'reactjs-tiptap-editor/mention';
 import { MoreMark } from 'reactjs-tiptap-editor/moremark';
 import { OrderedList } from 'reactjs-tiptap-editor/orderedlist';
 import { SearchAndReplace } from 'reactjs-tiptap-editor/searchandreplace';
+import { SearchCommand } from '@/extensions/SearchCommand';
 import { SlashCommand } from 'reactjs-tiptap-editor/slashcommand';
 import { Strike } from 'reactjs-tiptap-editor/strike';
 import { Table } from 'reactjs-tiptap-editor/table';
@@ -64,7 +65,6 @@ import { NoteSyntax } from '@/extensions/NoteSyntax';
 import { Connections } from '@/extensions/Connections';
 import { NERHighlight } from '@/extensions/NERHighlight';
 import { AIHighlight } from '@/extensions/AIHighlight';
-import { SearchCommand } from '@/extensions/SearchCommand';
 import AIControlBar from '@/components/ai/AIControlBar';
 
 // Import CSS
@@ -132,7 +132,7 @@ const extensions = [
   // Add connections extension for real-time parsing
   Connections,
   
-  // Add search command extensions
+  // Add search command extension
   SearchCommand,
   
   History,
