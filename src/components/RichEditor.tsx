@@ -65,8 +65,6 @@ import { Connections } from '@/extensions/Connections';
 import { NERHighlight } from '@/extensions/NERHighlight';
 import { AIHighlight } from '@/extensions/AIHighlight';
 import { SearchCommand } from '@/extensions/SearchCommand';
-import { QPSSearchCommand } from '@/extensions/QPSSearchCommand';
-import { BM25SearchCommand } from '@/extensions/BM25SearchCommand';
 import AIControlBar from '@/components/ai/AIControlBar';
 
 // Import CSS
@@ -136,8 +134,6 @@ const extensions = [
   
   // Add search command extensions
   SearchCommand,
-  QPSSearchCommand,
-  BM25SearchCommand,
   
   History,
   SearchAndReplace,
