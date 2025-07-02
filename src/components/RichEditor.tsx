@@ -65,6 +65,8 @@ import { NoteSyntax } from '@/extensions/NoteSyntax';
 import { Connections } from '@/extensions/Connections';
 import { NERHighlight } from '@/extensions/NERHighlight';
 import { AIHighlight } from '@/extensions/AIHighlight';
+import { SearchCommand } from '@/extensions/SearchCommand';
+import { QPSSearchCommand } from '@/extensions/QPSSearchCommand';
 import AIControlBar from '@/components/ai/AIControlBar';
 
 // Import CSS
@@ -132,8 +134,9 @@ const extensions = [
   // Add connections extension for real-time parsing
   Connections,
   
-  // Add search command extension
+  // Add search command extensions
   SearchCommand,
+  QPSSearchCommand,
   
   History,
   SearchAndReplace,
