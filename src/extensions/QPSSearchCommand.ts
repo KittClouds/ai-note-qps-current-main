@@ -16,8 +16,8 @@ export const QPSSearchCommand = Extension.create({
 
   addOptions() {
     return {
-      trigger: '??',
-      paletteKeys: ['Mod-k'],
+      trigger: '??qps',
+      paletteKeys: ['Mod-Shift-k'],
       fetchHits: async (query: string): Promise<QPSSearchHit[]> => {
         if (!query.trim()) return [];
         
