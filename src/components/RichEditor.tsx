@@ -40,7 +40,8 @@ import { MoreMark } from 'reactjs-tiptap-editor/moremark';
 import { OrderedList } from 'reactjs-tiptap-editor/orderedlist';
 import { SearchAndReplace } from 'reactjs-tiptap-editor/searchandreplace';
 import { SearchCommand } from '@/extensions/SearchCommand';
-import { SlashCommand } from 'reactjs-tiptap-editor/slashcommand';
+// Temporarily removing SlashCommand as it also uses suggestions and might conflict
+// import { SlashCommand } from 'reactjs-tiptap-editor/slashcommand';
 import { Strike } from 'reactjs-tiptap-editor/strike';
 import { Table } from 'reactjs-tiptap-editor/table';
 import { TableOfContents } from 'reactjs-tiptap-editor/tableofcontent';
@@ -54,7 +55,8 @@ import { Drawer } from 'reactjs-tiptap-editor/drawer';
 import { Excalidraw } from 'reactjs-tiptap-editor/excalidraw';
 import { Twitter } from 'reactjs-tiptap-editor/twitter';
 import { Mermaid } from 'reactjs-tiptap-editor/mermaid';
-import { QPSCommand } from '@/extensions/QPSCommand';
+// Temporarily removing QPSCommand to isolate the conflict
+// import { QPSCommand } from '@/extensions/QPSCommand';
 
 // Import custom extensions
 import { WikiLink } from '@/extensions/WikiLink';
@@ -99,7 +101,7 @@ function convertBase64ToBlob(base64: string) {
   return new Blob([u8arr], { type: mime });
 }
 
-// Extensions array with only SearchCommand and QPSCommand (no BM25SearchCommand to avoid conflicts)
+// Extensions array - temporarily simplified to isolate suggestion plugin conflicts
 const extensions = [
   BaseKit.configure({
     placeholder: {
@@ -133,9 +135,8 @@ const extensions = [
   // Add connections extension for real-time parsing
   Connections,
   
-  // Add search command extensions - only SearchCommand (??) and QPSCommand (@@@)
+  // Add only SearchCommand for now to isolate the issue
   SearchCommand,  // trigger: ??, shortcut: Mod-k
-  QPSCommand,     // trigger: @@@, shortcut: Mod-Shift-k
   
   History,
   SearchAndReplace,
@@ -186,7 +187,8 @@ const extensions = [
     GIPHY_API_KEY: import.meta.env.VITE_GIPHY_API_KEY || '',
   }),
   Blockquote,
-  SlashCommand,
+  // Temporarily removing SlashCommand as it might conflict with SearchCommand
+  // SlashCommand,
   HorizontalRule,
   Code.configure({
     toolbar: false,
