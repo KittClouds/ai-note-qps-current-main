@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDebouncedCallback } from '@/hooks/useDebouncedCallback';
 import { embeddingsService, SearchResult } from '@/lib/embeddings/embeddingsService';
 import { bm25Service, BM25SearchResult } from '@/lib/bm25/bm25Service';
@@ -313,6 +314,26 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
     return "Search notes...";
   };
 
+  const getSemanticModeLabel = (mode: SemanticMode) => {
+    switch (mode) {
+      case 'semantic': return 'Semantic';
+      case 'bm25': return 'BM25';
+      case 'hybrid': return 'Hybrid';
+      case 'qps': return 'QPS';
+      default: return mode;
+    }
+  };
+
+  const getSemanticModeIcon = (mode: SemanticMode) => {
+    switch (mode) {
+      case 'semantic': return Zap;
+      case 'bm25': return FileText;
+      case 'hybrid': return Blend;
+      case 'qps': return Database;
+      default: return Database;
+    }
+  };
+
   return (
     <div className={className}>
       <Tabs value={searchMode} onValueChange={handleModeChange} className="w-full mb-3">
@@ -342,54 +363,44 @@ export const EnhancedSearchBar: React.FC<EnhancedSearchBarProps> = ({
             <EmbeddingProviderButton />
           </div>
           
-          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <Zap className="h-4 w-4 text-primary" />
-              <button
-                onClick={() => handleSemanticModeChange('semantic')}
-                className={`text-sm font-medium transition-colors ${
-                  semanticMode === 'semantic' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Semantic
-              </button>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <FileText className="h-4 w-4 text-primary" />
-              <button
-                onClick={() => handleSemanticModeChange('bm25')}
-                className={`text-sm font-medium transition-colors ${
-                  semanticMode === 'bm25' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                BM25
-              </button>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Blend className="h-4 w-4 text-primary" />
-              <button
-                onClick={() => handleSemanticModeChange('hybrid')}
-                className={`text-sm font-medium transition-colors ${
-                  semanticMode === 'hybrid' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                Hybrid
-              </button>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Database className="h-4 w-4 text-primary" />
-              <button
-                onClick={() => handleSemanticModeChange('qps')}
-                className={`text-sm font-medium transition-colors ${
-                  semanticMode === 'qps' ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                QPS
-              </button>
-            </div>
+          {/* Cleaner semantic mode selector using Select component */}
+          <div className="space-y-2">
+            <Select value={semanticMode} onValueChange={handleSemanticModeChange}>
+              <SelectTrigger className="w-full">
+                <SelectValue>
+                  <div className="flex items-center space-x-2">
+                    {React.createElement(getSemanticModeIcon(semanticMode), { className: "h-4 w-4" })}
+                    <span>{getSemanticModeLabel(semanticMode)}</span>
+                  </div>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="semantic">
+                  <div className="flex items-center space-x-2">
+                    <Zap className="h-4 w-4" />
+                    <span>Semantic</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="bm25">
+                  <div className="flex items-center space-x-2">
+                    <FileText className="h-4 w-4" />
+                    <span>BM25</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="hybrid">
+                  <div className="flex items-center space-x-2">
+                    <Blend className="h-4 w-4" />
+                    <span>Hybrid</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="qps">
+                  <div className="flex items-center space-x-2">
+                    <Database className="h-4 w-4" />
+                    <span>QPS</span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {semanticMode === 'hybrid' && (
