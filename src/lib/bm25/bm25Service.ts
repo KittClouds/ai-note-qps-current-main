@@ -1,6 +1,8 @@
 
 import BM25, { BMDocument, BMConstants } from './bm25';
 import { Note } from '@/types/notes';
+import { Serializable, SerializedFields } from '@/lib/serialization';
+import { createChecksum } from '@/lib/utils/checksum';
 
 export interface BM25SearchResult {
   noteId: string;
@@ -17,11 +19,38 @@ export interface BM25IndexStatus {
   needsRebuild: boolean;
 }
 
-class BM25Service {
+class BM25Service extends Serializable {
+  ns_serializable = true;
+  ns_namespace = ['notes', 'search', 'bm25'];
   private documents: string[] = [];
   private noteMap: Map<number, Note> = new Map();
   private lastSyncTime: number = 0;
   private constants: BMConstants = { k1: 1.2, b: 0.75 };
+
+  constructor(kwargs?: SerializedFields) {
+    super(kwargs);
+    if (kwargs?.documents) {
+      this.documents = kwargs.documents;
+    }
+    if (kwargs?.noteMap) {
+      this.noteMap = new Map(kwargs.noteMap);
+    }
+    if (kwargs?.lastSyncTime) {
+      this.lastSyncTime = kwargs.lastSyncTime;
+    }
+    if (kwargs?.constants) {
+      this.constants = kwargs.constants;
+    }
+  }
+
+  get ns_attributes(): SerializedFields {
+    return {
+      documents: this.documents,
+      noteMap: Array.from(this.noteMap.entries()),
+      lastSyncTime: this.lastSyncTime,
+      constants: this.constants,
+    };
+  }
 
   private preprocessText(text: string): string {
     // Basic text preprocessing: lowercase, remove extra whitespace
@@ -110,6 +139,53 @@ class BM25Service {
     this.documents = [];
     this.noteMap.clear();
     this.lastSyncTime = 0;
+  }
+
+  /**
+   * Generate a checksum for the current index state
+   */
+  async getIndexChecksum(): Promise<string> {
+    const indexData = {
+      documents: this.documents,
+      noteMapEntries: Array.from(this.noteMap.entries()),
+      constants: this.constants,
+      lastSyncTime: this.lastSyncTime
+    };
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify(indexData));
+    return await createChecksum(data);
+  }
+
+  /**
+   * Serialize the index for persistence
+   */
+  serialize(): string {
+    return JSON.stringify(this.toJSON());
+  }
+
+  /**
+   * Deserialize and restore index from serialized data
+   */
+  static deserialize(serializedData: string): BM25Service {
+    const data = JSON.parse(serializedData);
+    if (data.type === 'constructor' && data.kwargs) {
+      return new BM25Service(data.kwargs);
+    }
+    throw new Error('Invalid serialized BM25 data');
+  }
+
+  /**
+   * Get index metadata for persistence
+   */
+  async getIndexMetadata() {
+    return {
+      version: '1.0',
+      documentCount: this.documents.length,
+      termCount: new Set(this.documents.flatMap(doc => this.tokenize(doc))).size,
+      checksum: await this.getIndexChecksum(),
+      lastSyncTime: this.lastSyncTime,
+      constants: this.constants
+    };
   }
 }
 

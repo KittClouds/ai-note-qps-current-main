@@ -296,6 +296,20 @@ export const tables = {
     }
   }),
 
+  // NEW: BM25 index snapshots table
+  bm25Indexes: State.SQLite.table({
+    name: 'bm25_indexes',
+    columns: {
+      id: State.SQLite.text({ primaryKey: true }),
+      version: State.SQLite.text(),
+      checksum: State.SQLite.text(),
+      data: State.SQLite.text(), // serialized BM25 index
+      metadata: State.SQLite.json({ schema: Schema.Any }),
+      createdAt: State.SQLite.text(),
+      updatedAt: State.SQLite.text()
+    }
+  }),
+
   // Client-only UI state (doesn't sync)
   uiState: State.SQLite.clientDocument({
     name: 'uiState',
@@ -418,6 +432,39 @@ export const events = {
     name: 'v1.HnswSnapshotDeleted',
     schema: Schema.Struct({
       fileName: Schema.String
+    })
+  }),
+
+  // NEW: BM25 index events
+  bm25IndexCreated: Events.synced({
+    name: 'v1.Bm25IndexCreated',
+    schema: Schema.Struct({
+      id: Schema.String,
+      version: Schema.String,
+      checksum: Schema.String,
+      data: Schema.String,
+      metadata: Schema.Any,
+      createdAt: Schema.String,
+      updatedAt: Schema.String
+    })
+  }),
+
+  bm25IndexUpdated: Events.synced({
+    name: 'v1.Bm25IndexUpdated',
+    schema: Schema.Struct({
+      id: Schema.String,
+      version: Schema.String,
+      checksum: Schema.String,
+      data: Schema.String,
+      metadata: Schema.Any,
+      updatedAt: Schema.String
+    })
+  }),
+
+  bm25IndexDeleted: Events.synced({
+    name: 'v1.Bm25IndexDeleted',
+    schema: Schema.Struct({
+      id: Schema.String
     })
   }),
 
@@ -611,6 +658,28 @@ const materializers = State.SQLite.materializers(events, {
     console.log('LiveStore Materializer Debug - HNSW Snapshot Deleted:', { fileName });
     const result = tables.hnswSnapshots.delete().where({ fileName });
     console.log('LiveStore Materializer Debug - HNSW snapshot delete result:', result);
+    return result;
+  },
+
+  // NEW: BM25 index materializers
+  'v1.Bm25IndexCreated': ({ id, version, checksum, data, metadata, createdAt, updatedAt }) => {
+    console.log('LiveStore Materializer Debug - BM25 Index Created:', { id, version, checksum, createdAt });
+    const result = tables.bm25Indexes.insert({ id, version, checksum, data, metadata, createdAt, updatedAt });
+    console.log('LiveStore Materializer Debug - BM25 index insert result:', result);
+    return result;
+  },
+
+  'v1.Bm25IndexUpdated': ({ id, version, checksum, data, metadata, updatedAt }) => {
+    console.log('LiveStore Materializer Debug - BM25 Index Updated:', { id, version, checksum, updatedAt });
+    const result = tables.bm25Indexes.update({ version, checksum, data, metadata, updatedAt }).where({ id });
+    console.log('LiveStore Materializer Debug - BM25 index update result:', result);
+    return result;
+  },
+
+  'v1.Bm25IndexDeleted': ({ id }) => {
+    console.log('LiveStore Materializer Debug - BM25 Index Deleted:', { id });
+    const result = tables.bm25Indexes.delete().where({ id });
+    console.log('LiveStore Materializer Debug - BM25 index delete result:', result);
     return result;
   }
 });
